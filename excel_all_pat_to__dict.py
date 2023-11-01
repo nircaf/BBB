@@ -1,11 +1,19 @@
 import pandas as pd
+import os
+
+
+def get_folders():
+    this_folder = os.getcwd()
+    files_location = this_folder + r"\Excel not age gender match"
+    excel_file = files_location + r"\merged.xlsx"
+    controls_file = files_location + r"\Controls.xlsx"
+    clinical_data = this_folder + r"\Epilepsy_clinical_data.xlsx"
+    return files_location, excel_file, controls_file, clinical_data
 
 
 def get_results():
-    files_location = r"C:\Nir\BBB\BBB\Excel not age gender match"
-    excel_file = files_location + r"\merged.xlsx"
-    controls_file = files_location + r"\Controls.xlsx"
-    clinical_data = r"C:\Nir\BBB\BBB\Epilepsy_clinical_data.xlsx"
+    # this folder
+    files_location, excel_file, controls_file, clinical_data = get_folders()
     clinical_data_df = pd.read_excel(clinical_data, sheet_name="All")
     Epilepsy_clinical_data = clinical_data_df
     # Epilepsy_clinical_data drop after row 47
@@ -261,8 +269,8 @@ def get_results():
     )
     df2 = pd.concat([df, df_2sd], axis=1)
     # df to csv
-    df2.to_csv("figures/df.csv")
-    return
+    # df2.to_csv("figures/df.csv")
+    return df, df_2sd
     df_epilepsy = pd.DataFrame(
         {
             "Epilepsy": result_mat_lin_age["Unnamed: 1"],
@@ -270,6 +278,96 @@ def get_results():
     )
     result_mat_lin_age.to_csv("figures/df_epilepsy.csv", index=False)
     df_126.to_csv("figures/df_126.csv", index=False)
+
+
+def results_paper_dyn():
+    # import mannwhitneyu
+    from scipy.stats import mannwhitneyu
+    import math
+
+    df, df_2sd = get_results()
+    mat = get_mat()
+    mat_lin_control = mat["result_mat_lin_age_control"]
+    mat_tofts_control = mat["result_mat_tofts_age_control"]
+    mat_lin = mat["result_mat_lin_age"]
+    mat_tofts = mat["result_mat_tofts_age"]
+    focal_pat_mat_lin = mat["focal_pat_mat_lin"]
+    focal_pat_mat_tofts = mat["focal_pat_mat_tofts"]
+    general_pat_mat_lin = mat["general_pat_mat_lin"]
+    general_pat_mat_tofts = mat["general_pat_mat_tofts"]
+    controls_avg_regions = (
+        (mat_lin_control - mat_lin_control.mean(axis=0)) / mat_lin_control.std(axis=0)
+    ).mean()
+    mat_lin_avg_regions = (
+        (mat_lin - mat_lin_control.mean(axis=0)) / mat_lin_control.std(axis=0)
+    ).mean()
+    focal_pat_mat_lin_avg_regions = (
+        (focal_pat_mat_lin - mat_lin_control.mean(axis=0)) / mat_lin_control.std(axis=0)
+    ).mean()
+    general_pat_mat_lin_avg_regions = (
+        (general_pat_mat_lin - mat_lin_control.mean(axis=0))
+        / mat_lin_control.std(axis=0)
+    ).mean()
+    # mann whitney df['Epilepsy'], df['Controls']
+    df["Epilepsy"] = pd.to_numeric(df["Epilepsy"], errors="coerce")
+    df["Controls"] = pd.to_numeric(df["Controls"], errors="coerce")
+    stats, p = mannwhitneyu(df["Epilepsy"].dropna(), df["Controls"].dropna())
+    exponent = math.floor(math.log10(abs(p)))
+    # mann whitney df['Epilepsy'], df['Controls']
+    d1 = pd.to_numeric(mat_lin_avg_regions, errors="coerce")
+    d2 = pd.to_numeric(controls_avg_regions, errors="coerce")
+    stats, p = mannwhitneyu(d1.dropna(), d2.dropna())
+    exponent2 = math.floor(math.log10(abs(p)))
+    pass
+    di = {}
+    """Regression analysis of brain volume using the in all patients with epilepsy revealed that 3.98 ± 8.96% of voxels exhibited BBBD,
+      while the mean standard deviation from the mean value of controls per region was 16.56 ± 23.16%. Statistical comparisons demonstrated significant differences BBBD%
+    between groups (p<0.0001) as well as in the percentage of areas with BBBD (p<0.0001)."""
+    di[
+        "Patients with epilepsy"
+    ] = f"""
+    Regression analysis of brain volume using the in all patients with epilepsy revealed that {df['Epilepsy'].mean():.2f} ± {df['Epilepsy'].std():.2f}% of voxels exhibited BBBD,
+    while the mean standard deviation from the controls for all regions was {mat_lin_avg_regions.mean():.2f} ± {mat_lin_avg_regions.std():.2f}%.
+    Statistical comparisons demonstrated significant differences BBBD% between groups (p<10^{exponent}) as well as in the mean standard deviation from the controls for all regions (p<10^{exponent2}).
+    """.replace(
+        "\n", " "
+    )
+    # mann whitney df['Focal Epilepsy'], df['Controls']
+    df["Focal Epilepsy"] = pd.to_numeric(df["Focal Epilepsy"], errors="coerce")
+    df["Controls"] = pd.to_numeric(df["Controls"], errors="coerce")
+    stats, p = mannwhitneyu(df["Focal Epilepsy"].dropna(), df["Controls"].dropna())
+    exponent = math.floor(math.log10(abs(p)))
+    # mann whitney df['Epilepsy'], df['Controls']
+    d1 = pd.to_numeric(focal_pat_mat_lin_avg_regions, errors="coerce")
+    d2 = pd.to_numeric(controls_avg_regions, errors="coerce")
+    stats, p = mannwhitneyu(d1.dropna(), d2.dropna())
+    exponent2 = math.floor(math.log10(abs(p)))
+    # mann whitney df['Generalized Epilepsy'], df['Controls']
+    df["Generalized Epilepsy"] = pd.to_numeric(
+        df["Generalized Epilepsy"], errors="coerce"
+    )
+    df["Controls"] = pd.to_numeric(df["Controls"], errors="coerce")
+    stats, p = mannwhitneyu(
+        df["Generalized Epilepsy"].dropna(), df["Controls"].dropna()
+    )
+    exponent3 = math.floor(math.log10(abs(p)))
+    # mann whitney df['Epilepsy'], df['Controls']
+    d1 = pd.to_numeric(general_pat_mat_lin_avg_regions, errors="coerce")
+    d2 = pd.to_numeric(controls_avg_regions, errors="coerce")
+    stats, p = mannwhitneyu(d1.dropna(), d2.dropna())
+    exponent4 = math.floor(math.log10(abs(p)))
+    di[
+        "focal_generalized"
+    ] = f"""
+    Regression analysis of brain volume using the in focal epilepsy revealed that {df['Focal Epilepsy'].mean():.2f} ± {df['Focal Epilepsy'].std():.2f}% of voxels exhibited BBBD,
+    while the mean standard deviation from the controls for all regions was {focal_pat_mat_lin_avg_regions.mean():.2f} ± {focal_pat_mat_lin_avg_regions.std():.2f}%.
+    For generalized epilepsy, the regression analysis revealed that {df['Generalized Epilepsy'].mean():.2f} ± {df['Generalized Epilepsy'].std():.2f}% of voxels exhibited BBBD,
+    while the mean standard deviation from the controls for all regions was {general_pat_mat_lin_avg_regions.mean():.2f} ± {general_pat_mat_lin_avg_regions.std():.2f}%.
+    Statistical comparisons demonstrated significant differences in focal epilepsy compares to controls (p<10^{exponent}) as well as in the mean standard deviation from the controls for all regions (p<10^{exponent2}).
+    Statistical comparisons demonstrated significant differences in Generalized epilepsy compares to controls (p<10^{exponent3}) as well as in the mean standard deviation from the controls for all regions (p<10^{exponent4}).
+    """.replace(
+        "\n", " "
+    )
 
 
 def get_126_areas(clinical_data_df, result_mat_lin_age):
@@ -300,10 +398,8 @@ def get_126_areas(clinical_data_df, result_mat_lin_age):
 
 
 def get_mat():
-    files_location = r"C:\Nir\BBB\BBB\Excel not age gender match"
-    excel_file = files_location + r"\merged.xlsx"
-    controls_file = files_location + r"\Controls.xlsx"
-    clinical_data = r"C:\Nir\BBB\BBB\Epilepsy_clinical_data.xlsx"
+    files_location, excel_file, controls_file, clinical_data = get_folders()
+
     clinical_data_df = pd.read_excel(clinical_data, sheet_name="All")
     # until row 44
     clinical_data_df = clinical_data_df.iloc[:44]
@@ -355,6 +451,9 @@ def get_mat():
     ].drop(columns=["ID"])
     mat["rest_epilepsy_t_areas_tofts"] = mat["rest_epilepsy_t_areas_lin"]
     mat["controls_t_areas_lin"] = mat["result_mat_lin_age_control"]
+    mat["controls_t_areas_lin"].columns = mat["controls_t_areas_lin"].columns.str.strip(
+        "'"
+    )
     mat["controls_t_areas_tofts"] = mat["controls_t_areas_lin"]
     # create df
     return mat
@@ -437,5 +536,6 @@ def merge_xlsx():
 
 if __name__ == "__main__":
     # merge_xlsx()
+    results_paper_dyn()
     get_results()
     get_mat()
