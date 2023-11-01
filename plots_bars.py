@@ -98,19 +98,17 @@ if __name__ == "__main__":
         if pats_lin == []:
             continue
         # get % of pats above 2 std from mean of controls
-        val_lin = (
-            100
-            * sum(((pats_lin - controls_lin_mean) / controls_lin_std) >= 2)
-            / len(pats_lin)
-        )
+        # val_lin = (
+        #     100
+        #     * sum(((pats_lin - controls_lin_mean) / controls_lin_std) >= 2)
+        #     / len(pats_lin)
+        # )
+        # number of stds above controls
+        val_lin = (((pats_lin - controls_lin_mean) / controls_lin_std)).mean()
         df.loc[area, "lin"] = val_lin
         # mann whitney test
         df.loc[area, "lin_sig"] = stats.mannwhitneyu(pats_lin, controls_lin)[1]
-        val_tofts = (
-            100
-            * sum(((pats_tofts - controls_tofts_mean) / controls_tofts_std) >= 2)
-            / len(pats_tofts)
-        )
+        val_tofts = ((pats_tofts - controls_tofts_mean) / controls_tofts_std).mean()
         df.loc[area, "tofts"] = val_tofts
         df.loc[area, "tofts_sig"] = stats.mannwhitneyu(pats_tofts, controls_tofts)[1]
         df.loc[area, "sum_lin_tofts"] = val_lin + val_tofts
@@ -118,24 +116,11 @@ if __name__ == "__main__":
             (pats_tofts + pats_lin), (controls_tofts + controls_lin)
         )[1]
         df.loc[area, "lin_focal"] = (
-            100
-            * sum(
-                ((focal_pat_mat_lin.iloc[:, i] - controls_lin_mean) / controls_lin_std)
-                >= 2
-            )
-            / len(focal_pat_mat_lin)
-        )
+            (focal_pat_mat_lin.iloc[:, i] - controls_lin_mean) / controls_lin_std
+        ).mean()
         df.loc[area, "lin_general"] = (
-            100
-            * sum(
-                (
-                    (general_pat_mat_lin.iloc[:, i] - controls_lin_mean)
-                    / controls_lin_std
-                )
-                >= 2
-            )
-            / len(general_pat_mat_lin)
-        )
+            (general_pat_mat_lin.iloc[:, i] - controls_lin_mean) / controls_lin_std
+        ).mean()
         df.loc[area, "tofts_focal"] = (
             100
             * sum(
@@ -217,25 +202,51 @@ if __name__ == "__main__":
         # set gca text size 20
         plt.tick_params(labelsize=font_size)
         plt.savefig("figures/" + title + ".png", bbox_inches="tight")
-
         plt.show(block=False)
-        # save to file
+
+    def plot_academic_bar2(df, y, color, title, legend=False, indexes=None):
+        font_size = 30
+        font_name = {"fontname": "Times New Roman"}
+        # set figure HD
+        plt.figure(figsize=(12, 10))
+        ax = plt.gca()
+        # plt.bar
+        # if df is dataframe
+        df.plot(kind="bar", y=y, color=color, ax=plt.gca(), width=0.8)
+        ax.set_xticks(range(0, df.shape[0], 20))
+        ax.set_xticklabels(range(0, df.shape[0], 20))
+        if legend:
+            plt.legend(legend, fontsize=font_size * 0.8, loc="upper right").set_visible(
+                True
+            )
+        else:
+            # legend off
+            plt.legend().set_visible(False)
+        plt.gca().set_facecolor("w")
+        ax.set_facecolor("w")
+        # ylabel % of patients with BBBD
+        plt.ylabel("Mean std above controls", fontsize=font_size, **font_name)
+        plt.xlabel("Region", fontsize=font_size, **font_name)
+        plt.grid(color="k", linewidth=0.5, axis="y")
+        plt.show(block=False)
+        plt.savefig("figures/" + title + ".png", bbox_inches="tight")
 
     # sort lin descending
     df = df.sort_values(by="lin", ascending=False)
     inclusion = 0.00000000003
     # find lin_sig < 0.05
     df_lin = df.head(sum(df["lin_sig"] < inclusion))
+    df_lin = df["lin"]
     # plot bar df lin in cyan
 
     # indexes in both df_t and df_lin
     indexes = df_lin.index
     print(f'Regions in both slow and fast: {", ".join(indexes.values)}')
     # plot lin
-    plot_academic_bar(
+    plot_academic_bar2(
         df_lin,
         "lin",
-        "black",
+        "red",
         "% of patients with slow BBBD per region",
         indexes=indexes,
     )
@@ -259,13 +270,13 @@ if __name__ == "__main__":
     df_lin_f = df[
         (df["sig_lin_focal"] < inclusion) & (df["sig_lin_general"] < inclusion)
     ]
-
+    df_lin_f = df[["lin_focal", "lin_general"]]
     indexes = df_lin_f.index
     # plot bar df lin in cya
-    plot_academic_bar(
+    plot_academic_bar2(
         df_lin_f,
-        ["lin_focal", "lin_general"],
-        ["gray", "black"],
+        ["lin_general", "lin_focal"],
+        ["#FF0000", "#800000"],
         "% of focal and generalized patients with slow BBBD per region",
         legend=["Focal", "Generalized"],
         indexes=indexes,
