@@ -11,7 +11,3 @@ repos:
             -   id: check-yaml
             -   id: requirements-txt-fixer
             -   id: check-ast
-    -   repo: https://github.com/psf/black
-        rev: stable
-        hooks:
-        - id: black

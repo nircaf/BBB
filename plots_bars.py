@@ -225,7 +225,11 @@ if __name__ == "__main__":
         plt.gca().set_facecolor("w")
         ax.set_facecolor("w")
         # ylabel % of patients with BBBD
-        plt.ylabel("Mean std above controls", fontsize=font_size, **font_name)
+        plt.ylabel("Zscore", fontsize=font_size, **font_name)
+        # yticks rotation 0
+        plt.xticks(rotation=0)
+        # tick fontsize
+        plt.tick_params(labelsize=font_size*0.8)
         plt.xlabel("Region", fontsize=font_size, **font_name)
         plt.grid(color="k", linewidth=0.5, axis="y")
         plt.show(block=False)
