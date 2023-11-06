@@ -3,10 +3,10 @@ import os
 
 
 def get_folders():
-    this_folder = os.getcwd()
+    this_folder = r"C:\Nir\BBB\BBB"
     files_location = this_folder + r"\Excel not age gender match"
-    excel_file = files_location + r"\merged.xlsx"
-    controls_file = files_location + r"\Controls.xlsx"
+    excel_file = files_location + r"\epilepsy\merged.xlsx"
+    controls_file = files_location + r"\controls\merged.xlsx"
     clinical_data = this_folder + r"\Epilepsy_clinical_data.xlsx"
     return files_location, excel_file, controls_file, clinical_data
 
@@ -15,12 +15,16 @@ def get_results():
     # this folder
     files_location, excel_file, controls_file, clinical_data = get_folders()
     clinical_data_df = pd.read_excel(clinical_data, sheet_name="All")
-    Epilepsy_clinical_data = clinical_data_df
     # Epilepsy_clinical_data drop after row 47
-    Epilepsy_clinical_data = Epilepsy_clinical_data.iloc[:44, :]
+    nan_code_index = clinical_data_df[clinical_data_df["code"].isna()].index[0]
+    clinical_data_df = clinical_data_df.iloc[:nan_code_index]
+    Epilepsy_clinical_data = clinical_data_df
     di = {}
     result_mat_lin_age = pd.read_excel(excel_file, sheet_name="BBB_percent_Linear")
     result_mat_lin_age = get_126_areas(clinical_data_df, result_mat_lin_age)
+    # rename Lin to y_target
+    result_mat_lin_age = result_mat_lin_age.rename(columns={"Lin": "y_target"})
+    controls_age_gender = pd.read_excel(clinical_data, sheet_name="Controls")
     controls_lin = pd.read_excel(controls_file, sheet_name="BBB_percent_Linear")
     #  (mean age = 27.39 ± 9.98, 53.57% male)
     # get age mean and std
@@ -30,12 +34,10 @@ def get_results():
     epilepsy_gender = epilepsy_gender.str.strip("'").str.strip().str.upper()
     # Epilepsy_clinical_data["'gender'"]=="'M'" or Epilepsy_clinical_data["'gender'"]=='M'
     di["male_mean"] = (sum(epilepsy_gender == "M")) / len(epilepsy_gender)
-    di["BBBP_lin_mean"] = result_mat_lin_age["Unnamed: 1"].mean()
-    di["BBBP_lin_std"] = result_mat_lin_age["Unnamed: 1"].std()
-    controls_mean = controls_lin["Linear"].mean()
-    contorls_std = controls_lin["Linear"].std()
-    control_gender = controls_lin["Gender"]
-    controls_age = controls_lin["age"]
+    di["BBBP_lin_mean"] = result_mat_lin_age["y_target"].mean()
+    di["BBBP_lin_std"] = result_mat_lin_age["y_target"].std()
+    control_gender = controls_age_gender["Gender"]
+    controls_age = controls_age_gender["age"]
     control_gender = control_gender.str.strip("'").str.strip().str.upper()
     di["male_mean_controls"] = (sum(control_gender == "M")) / len(control_gender)
     di[
@@ -130,11 +132,11 @@ def get_results():
     """.replace(
         "\n", " "
     )
-    # create df of result_mat_lin_age["Unnamed: 1"] and controls_lin["Linear"]
+    # create df of result_mat_lin_age["y_target"] and controls_lin["Linear"]
     df = pd.DataFrame(
         {
-            "Controls": controls_lin["Linear"],
-            "Epilepsy": result_mat_lin_age["Unnamed: 1"],
+            "Controls": controls_lin["Lin"],
+            "Epilepsy": result_mat_lin_age["y_target"],
             "Focal Epilepsy": result_mat_lin_age[
                 result_mat_lin_age["ID"]
                 .iloc[:, 1]
@@ -143,7 +145,7 @@ def get_results():
                         clinical_data_df["Focal/General"].str.contains("F") == True
                     ]["code"]
                 )
-            ]["Unnamed: 1"].reset_index(drop=True),
+            ]["y_target"].reset_index(drop=True),
             "Generalized Epilepsy": result_mat_lin_age[
                 result_mat_lin_age["ID"]
                 .iloc[:, 1]
@@ -152,7 +154,7 @@ def get_results():
                         clinical_data_df["Focal/General"].str.contains("G") == True
                     ]["code"]
                 )
-            ]["Unnamed: 1"].reset_index(drop=True),
+            ]["y_target"].reset_index(drop=True),
             "Frontal Epilepsy": result_mat_lin_age[
                 result_mat_lin_age["ID"]
                 .iloc[:, 1]
@@ -161,7 +163,7 @@ def get_results():
                         clinical_data_df["Focal Type"].str.contains("F") == True
                     ]["code"]
                 )
-            ]["Unnamed: 1"].reset_index(drop=True),
+            ]["y_target"].reset_index(drop=True),
             "Temporal Epilepsy": result_mat_lin_age[
                 result_mat_lin_age["ID"]
                 .iloc[:, 1]
@@ -170,7 +172,7 @@ def get_results():
                         clinical_data_df["Focal Type"].str.contains("T") == True
                     ]["code"]
                 )
-            ]["Unnamed: 1"].reset_index(drop=True),
+            ]["y_target"].reset_index(drop=True),
         }
     )
     result_mat_lin_age126 = pd.read_excel(excel_file, sheet_name="126_Regions_Linear")
@@ -267,24 +269,185 @@ def get_results():
             ).reset_index(drop=True),
         }
     )
+    # for each row in result_mat_lin_age get % of areas above 2 sd of controls
+    df_2sd = pd.DataFrame(
+        {
+            "Controls": controls_126.apply(
+                lambda row:
+                 (row - controls_126_mean) / controls_126_std,
+                axis=1,
+            ).reset_index(drop=True).mean(),
+            "Epilepsy": df_126.apply(
+                lambda row:
+                 (row - controls_126_mean) / controls_126_std ,
+                axis=1,
+            ).reset_index(drop=True).mean(),
+            "Focal Epilepsy": df_126_focal.apply(
+                lambda row:
+                 (row - controls_126_mean) / controls_126_std ,
+                axis=1,
+            ).reset_index(drop=True).mean(),
+            "Generalized Epilepsy": df_126_general.apply(
+                lambda row:
+                 (row - controls_126_mean) / controls_126_std,
+                axis=1,
+            ).reset_index(drop=True).mean(),
+            "Frontal Epilepsy": df_126_frontal.apply(
+                lambda row:
+                 (row - controls_126_mean) / controls_126_std ,
+                axis=1,
+            ).reset_index(drop=True).mean(),
+            "Temporal Epilepsy": df_126_temporal.apply(
+                lambda row:
+                 (row - controls_126_mean) / controls_126_std ,
+                axis=1,
+            ).reset_index(drop=True).mean(),
+        }
+    )
+    df_2sd_t = pd.DataFrame({"Epilepsy": df_126.apply(
+                lambda row:
+                 (row - controls_126_mean) / controls_126_std ,
+                axis=1,
+            ).reset_index(drop=True).mean(axis=1),}
+    )
     df2 = pd.concat([df, df_2sd], axis=1)
     # df to csv
-    # df2.to_csv("figures/df.csv")
+    # df_126.to_csv("figures/df_126.csv", index=False)
+    # medicine_df(clinical_data_df,result_mat_lin_age,df_126,controls_126_mean,controls_126_std)
+    # plots(df,df_2sd)
     return df, df_2sd
     df_epilepsy = pd.DataFrame(
         {
-            "Epilepsy": result_mat_lin_age["Unnamed: 1"],
+            "Epilepsy": result_mat_lin_age["y_target"],
         }
     )
     result_mat_lin_age.to_csv("figures/df_epilepsy.csv", index=False)
     df_126.to_csv("figures/df_126.csv", index=False)
+
+def plots(df,df_2sd,clinical_data_df,df_2sd_t):
+    create_scientific_boxplot(df[['Controls','Epilepsy']],y_label="BBB%",palette=sns.color_palette(["#000000", "#FF0000"]),filename = 'BBB_controls_epilepsy')
+    create_scientific_boxplot(df_2sd[['Controls','Epilepsy']],y_label="Zscore",palette=sns.color_palette(["#000000", "#FF0000"]),filename = 'zsocre_controls_epilepsy')
+    create_scientific_boxplot(df[['Generalized Epilepsy','Focal Epilepsy','Frontal Epilepsy']],y_label="BBB%",palette=sns.color_palette(["#FF0000", "#990000", "#660000"]),filename = 'BBB_general_focal_frontal_epilepsy')
+    create_scientific_boxplot(df_2sd[['Generalized Epilepsy','Focal Epilepsy','Frontal Epilepsy']],y_label="Zscore",palette=sns.color_palette(["#FF0000", "#990000", "#660000"]),filename = 'zsocre_general_focal_frontal_epilepsy')
+    # Lesion
+    df2 = pd.DataFrame(
+        {
+            "No Lesion": df[clinical_data_df['Lesion'] ==0]['Epilepsy'],
+            "Lesion": df[clinical_data_df['Lesion'] !=0]['Epilepsy'],
+        }
+    )
+    create_scientific_boxplot(df2,y_label="BBB%",palette=sns.color_palette(["#000000", "#FF0000"]),filename = 'BBB_lesion')
+    df2 = pd.DataFrame(
+        {
+            "No Lesion": df_2sd_t[clinical_data_df['Lesion'] ==0]['Epilepsy'],
+            "Lesion": df_2sd_t[clinical_data_df['Lesion'] !=0]['Epilepsy'],
+        }
+    )
+    create_scientific_boxplot(df2,y_label="Zscore",palette=sns.color_palette(["#000000", "#FF0000"]),filename = 'zsocre_lesion')
+
+def medicine_df(clinical_data_df,result_mat_lin_age,df_126,controls_126_mean,controls_126_std):
+    medications = ['Phenytoin', 'Divalproex', 'Lamotrigine', 'Levetiracetam', 'Ethosuximide', 'Perampanel', 'Brivaracetam', 'Gabapentin', 'Trileptin', 'Eslicarbazepine', 'Clobazam', 'Lacosamide', 'Zonisamide', 'Eslicarbazepine', 'Phenytoin', 'Topiramate']
+    med_series = clinical_data_df["'Medications'"]
+    # make list of how many medications each patient has
+    med_list = []
+    for meds in med_series:
+        # input("Press enter to continue to the next iteration...")
+        if pd.isna(meds):
+            med_list.append(0)
+        else:
+            # count how many items from list medications appear in meds
+            med_list.append(len([x for x in medications if x in str(meds)]))
+    # get the inde of the last 0 in med_list
+    med_zero = 44
+    med_list = med_list[:min(result_mat_lin_age.shape[0],med_zero)]
+    result_mat_lin_age = result_mat_lin_age[:min(result_mat_lin_age.shape[0],med_zero)]
+    df_126_mean = df_126.apply(
+                lambda row:
+                (row - controls_126_mean) / controls_126_std ,
+                axis=1,
+            ).reset_index(drop=True).mean(axis=1)
+    df_126_mean = df_126_mean[:min(result_mat_lin_age.shape[0],med_zero)]
+    # create df
+    df_bbb = pd.DataFrame({"1 medicine": result_mat_lin_age.loc[[x==1 for x in med_list],:]['y_target'].reset_index(drop=True)
+                       , "2 medicines": result_mat_lin_age.loc[[x==2 for x in med_list],:]['y_target'].reset_index(drop=True)
+                       , "3+ medicines": result_mat_lin_age.loc[[x>2 for x in med_list],:]['y_target'].reset_index(drop=True)
+                       })
+    create_scientific_boxplot(df_bbb,y_label="BBB%",palette=sns.color_palette(["#FF0000", "#990000", "#660000"]),filename = 'BBB_medications')
+    df_126_med = pd.DataFrame({"1 medicine": df_126_mean.loc[[x==1 for x in med_list]].reset_index(drop=True)
+                       , "2 medicines": df_126_mean.loc[[x==2 for x in med_list]].reset_index(drop=True)
+                       , "3+ medicines": df_126_mean.loc[[x>2 for x in med_list]].reset_index(drop=True)
+                       })
+    create_scientific_boxplot(df_126_med,y_label="Zscore",palette=sns.color_palette(["#FF0000", "#990000", "#660000"]),filename = 'zsocre_medications')
+    return med_list
+
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+import plotting
+
+def create_scientific_boxplot(df_bbb,y_label="Value",palette="Set1",filename = 'a'):
+    from scipy.stats import mannwhitneyu
+    # Set the style
+    sns.set(style="whitegrid")
+    # Create the boxplot
+    plt.figure(figsize=(8, 6))
+    font_size = 18
+    # Perform the Mann-Whitney U test between each pair of columns
+    for i in range(len(df_bbb.columns)):
+        for j in range(i+1, len(df_bbb.columns)):
+            # Ignore NaNs
+            data1 = df_bbb.iloc[:, i].dropna()
+            data2 = df_bbb.iloc[:, j].dropna()
+            # coerced to float
+            data1 = data1.astype(float)
+            data2 = data2.astype(float)
+            stat, p = mannwhitneyu(data1, data2)
+            if p<0.05:
+                # Add a line between the two boxes
+                ax = plt.gca()
+                y_height = df_bbb.max().max() * 1.02
+                # get the color of ax at point (i, y_height)
+                try:
+                    # get number of  ax.lines
+                    num_lines = len(ax.lines)
+                    y_height *= (1 + (.03 * num_lines))
+                except:
+                    y_height = y_height
+                ax.plot([i, j], [y_height, y_height], color='black', linestyle='--', linewidth=1)
+                # write number of * based on p value
+                astrixs = plotting.convert_pvalue_to_asterisks(p)
+                # Write above the middle of the line the asterisks
+                ax.text((i + j) / 2, y_height, astrixs, ha='center', va='center',fontsize=font_size)
+    df_melted = df_bbb.melt(var_name='Medicine Count', value_name='Value')
+    ax = sns.boxplot(data=df_bbb, palette=palette, width=0.7, boxprops=dict(facecolor=(1, 1, 1, 0)), showfliers=False)
+    ax = sns.swarmplot(x='Medicine Count', y='Value', data=df_melted, hue='Medicine Count', palette=palette, facecolor='none')
+    # Customize the plot
+    # ax.set_xlabel("Number of Medicines", fontsize=16)
+    ax.set_ylabel(y_label, fontsize=font_size)
+    # plt.title(f"{y_label} vs Medicines", fontsize=font_size)
+    # Customize font sizes for better readability
+    ax.tick_params(labelsize=font_size)
+    plt.xticks(fontsize=font_size)
+    plt.yticks(fontsize=font_size)
+    # remove x axis label
+    ax.set_xlabel(None)
+    # New code to remove the legend title
+    legend = ax.get_legend()
+    legend.set_title(None)
+    # legend text size
+    for text in legend.get_texts():
+        text.set_fontsize(int(font_size*0.8))
+    # Save the plot as an image (e.g., in PDF or PNG format)
+    plt.savefig(f"figures/{filename}.png", dpi=900, bbox_inches="tight")
+    # Display the plot
+    plt.show(block=False)
+    pass
 
 
 def results_paper_dyn():
     # import mannwhitneyu
     from scipy.stats import mannwhitneyu
     import math
-
     df, df_2sd = get_results()
     mat = get_mat()
     mat_lin_control = mat["result_mat_lin_age_control"]
@@ -320,9 +483,6 @@ def results_paper_dyn():
     exponent2 = math.floor(math.log10(abs(p)))
     pass
     di = {}
-    """Regression analysis of brain volume using the in all patients with epilepsy revealed that 3.98 ± 8.96% of voxels exhibited BBBD,
-      while the mean standard deviation from the mean value of controls per region was 16.56 ± 23.16%. Statistical comparisons demonstrated significant differences BBBD%
-    between groups (p<0.0001) as well as in the percentage of areas with BBBD (p<0.0001)."""
     di[
         "Patients with epilepsy"
     ] = f"""
@@ -368,6 +528,7 @@ def results_paper_dyn():
     """.replace(
         "\n", " "
     )
+    pass
 
 
 def get_126_areas(clinical_data_df, result_mat_lin_age):
@@ -375,6 +536,8 @@ def get_126_areas(clinical_data_df, result_mat_lin_age):
     codes = clinical_data_df["code"]
     # remove nan from codes
     codes = codes.dropna()
+    # codes strip "'"
+    codes = codes.str.strip("'")
     # run over result_mat_lin_age
     for index, row in result_mat_lin_age.iterrows():
         if "'ID'" in row:
@@ -401,27 +564,21 @@ def get_mat():
     files_location, excel_file, controls_file, clinical_data = get_folders()
 
     clinical_data_df = pd.read_excel(clinical_data, sheet_name="All")
+    clinical_data_df["code"] = clinical_data_df["code"].str.strip("'")
+    nan_code_index = clinical_data_df[clinical_data_df["code"].isna()].index[0]
     # until row 44
-    clinical_data_df = clinical_data_df.iloc[:44]
+    clinical_data_df = clinical_data_df.iloc[:nan_code_index]
     mat = {}
     # read sheet 128_Reagions_Linear
     result_mat_lin_age = pd.read_excel(excel_file, sheet_name="126_Regions_Linear")
-    mat["result_mat_lin_age_control"] = pd.read_excel(
-        controls_file, sheet_name="126_Regions_Linear"
-    ).drop(columns=["'ID'"])
+    mat["result_mat_lin_age_control"] = pd.read_excel(controls_file, sheet_name="126_Regions_Linear").drop(columns=["'ID'"])
     df_126 = get_126_areas(clinical_data_df, result_mat_lin_age)
     # remove rows from clinical_data_df where code is not in result_mat_lin_age
-    clinical_data_df = clinical_data_df[
-        clinical_data_df["code"].isin(df_126["ID"])
-    ].reset_index(drop=True)
+    clinical_data_df = clinical_data_df[clinical_data_df["code"].isin(df_126["ID"])].reset_index(drop=True)
     mat["result_mat_lin_age"] = df_126.drop(columns=["ID"])
     # mat['focal_pat_mat_lin'] = result_mat_lin_age where clinical_data_df['Focal/General'] == 'F'
-    mat["focal_pat_mat_lin"] = df_126[clinical_data_df["Focal/General"] == "F"].drop(
-        columns=["ID"]
-    )
-    mat["general_pat_mat_lin"] = df_126[clinical_data_df["Focal/General"] == "G"].drop(
-        columns=["ID"]
-    )
+    mat["focal_pat_mat_lin"] = df_126[clinical_data_df["Focal/General"] == "F"].drop(columns=["ID"])
+    mat["general_pat_mat_lin"] = df_126[clinical_data_df["Focal/General"] == "G"].drop(columns=["ID"])
     mat["result_mat_tofts_age_control"] = mat["result_mat_lin_age_control"]
     mat["result_mat_tofts_age"] = mat["result_mat_lin_age"]
     mat["focal_pat_mat_tofts"] = mat["focal_pat_mat_lin"]
@@ -464,28 +621,6 @@ def get_mat():
         ]["code"]
     )
 
-
-# result_mat_lin_age read sheet
-# mat_lin_control = mat['result_mat_lin_age_control']
-# mat_tofts_control = mat['result_mat_tofts_age_control']
-# mat_lin = mat['result_mat_lin_age']
-# mat_tofts = mat['result_mat_tofts_age']
-# focal_pat_mat_lin = mat['focal_pat_mat_lin']
-# focal_pat_mat_tofts = mat['focal_pat_mat_tofts']
-# general_pat_mat_lin = mat['general_pat_mat_lin']
-# general_pat_mat_tofts = mat['general_pat_mat_tofts']
-# "fronal_epilepsy_f_areas_lin": {},
-# "fronal_epilepsy_f_areas_tofts": {},
-# "rest_epilepsy_f_areas_lin": {},
-# "rest_epilepsy_f_areas_tofts": {},
-# "controls_f_areas_lin": {},
-# "controls_f_areas_tofts": {},
-# "temporal_epilepsy_t_areas_lin": {},
-# "temporal_epilepsy_t_areas_tofts": {},
-# "rest_epilepsy_t_areas_lin": {},
-# "rest_epilepsy_t_areas_tofts": {},
-# "controls_t_areas_lin": {},
-# "controls_t_areas_tofts": {},
 import os
 
 
@@ -507,20 +642,37 @@ def renmaes():
             print("found")
 
 
-def merge_xlsx():
+def merge_xlsx(path):
     import pandas as pd
     import numpy as np
     import os
     import glob
     import re
-
+    from openpyxl import load_workbook
     # Read excel files from D:\Dropbox (BGU DAL BBB Group)\Nir_Epilepsy_Controls\Epilepsy\Analyse\Excel_results
-    path = r"C:\Nir\BBB\BBB\Excel not age gender match"
     all_files = glob.glob(os.path.join(path, "*.xlsx"))
     # read get the names of sheet from all_files[0]
     excel_file = pd.ExcelFile(all_files[0])
     # get the names of sheets
     sheet_names = excel_file.sheet_names
+    # run over all_files
+    for f in all_files:
+        # run over sheet_names
+        for sheet in sheet_names:
+            # get first row of sheet
+            columns_sheet = pd.read_excel(f, sheet_name=sheet, nrows=1).columns
+            # if there is a number in columns_sheet
+            if any(isinstance(x, float) for x in columns_sheet):
+                # read excel with openpyxl
+                wb = load_workbook(f)
+                shee = wb[sheet]
+                # insert row above first
+                shee.insert_rows(1)
+                # write the first row of sheet ['ID','Lin']
+                shee.cell(1, 1).value = "'ID'"
+                shee.cell(1, 2).value = "Lin"
+                # save
+                wb.save(f)
     excel_file_name = os.path.join(path, "merged.xlsx")
     # create empty excel file
     pd.DataFrame().to_excel(excel_file_name)
@@ -535,7 +687,8 @@ def merge_xlsx():
 
 
 if __name__ == "__main__":
-    # merge_xlsx()
+    # merge_xlsx(path = r"C:\Nir\BBB\BBB\Excel not age gender match\controls")
+    # merge_xlsx(path = r"C:\Nir\BBB\BBB\Excel not age gender match\epilepsy")
     results_paper_dyn()
     get_results()
     get_mat()
