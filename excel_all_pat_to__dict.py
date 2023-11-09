@@ -312,9 +312,10 @@ def get_results():
     )
     df2 = pd.concat([df, df_2sd], axis=1)
     # df to csv
-    # df_126.to_csv("figures/df_126.csv", index=False)
-    # medicine_df(clinical_data_df,result_mat_lin_age,df_126,controls_126_mean,controls_126_std)
-    # plots(df,df_2sd)
+    # df_2sd.to_csv("figures/df_126_areas_mean.csv", index=False)
+    df.to_csv("figures/df_BBB_percent.csv", index=False)
+    medicine_df(clinical_data_df,result_mat_lin_age,df_126,controls_126_mean,controls_126_std)
+    plots(df,df_2sd)
     return df, df_2sd
     df_epilepsy = pd.DataFrame(
         {
@@ -324,16 +325,46 @@ def get_results():
     result_mat_lin_age.to_csv("figures/df_epilepsy.csv", index=False)
     df_126.to_csv("figures/df_126.csv", index=False)
 
+def most_penetrable_regions(df_2sd):
+    region_epilepsy = df_2sd['Epilepsy'].sort_values(ascending=False).iloc[:10].apply(lambda x: round(x, 2))
+    region_controls = df_2sd['Controls'].sort_values(ascending=False).iloc[:10]
+    region_focal = df_2sd['Focal Epilepsy']
+    region_general = df_2sd['Generalized Epilepsy']
+    region_focal = merge_regions_sides(region_focal).sort_values(ascending=False)
+    region_general = merge_regions_sides(region_general).sort_values(ascending=False)
+    i = 1
+    while True:
+        region_focal_temp = merge_regions_sides(region_focal).sort_values(ascending=False).iloc[:i].apply(lambda x: round(x, 2))
+        region_general_temp = merge_regions_sides(region_general).sort_values(ascending=False).iloc[:i].apply(lambda x: round(x, 2))
+        indexes = region_focal_temp[region_focal_temp.index.isin(region_general_temp.index)].index
+        if len(indexes) >= 3 or i >= min(len(region_focal), len(region_general)):
+            break
+        i += 1
+    region_focal_temp[indexes]
+    region_general_temp[indexes]
+    str_paper = f"""
+    Focal regions with most BBBD in patients with epilepsy are {region_focal_temp[indexes]}.
+    """.replace('\n', '')
+def merge_regions_sides(df):
+    # df remove from 'Left' and 'Right'
+    df.index = df.index.str.replace('Left ', '').str.replace('Right ', '')
+    # find similar indexes and average them
+    df = df.groupby(df.index).max()
+    return df
+
 def plots(df,df_2sd,clinical_data_df,df_2sd_t):
     create_scientific_boxplot(df[['Controls','Epilepsy']],y_label="BBB%",palette=sns.color_palette(["#000000", "#FF0000"]),filename = 'BBB_controls_epilepsy')
     create_scientific_boxplot(df_2sd[['Controls','Epilepsy']],y_label="Zscore",palette=sns.color_palette(["#000000", "#FF0000"]),filename = 'zsocre_controls_epilepsy')
     create_scientific_boxplot(df[['Generalized Epilepsy','Focal Epilepsy','Frontal Epilepsy']],y_label="BBB%",palette=sns.color_palette(["#FF0000", "#990000", "#660000"]),filename = 'BBB_general_focal_frontal_epilepsy')
     create_scientific_boxplot(df_2sd[['Generalized Epilepsy','Focal Epilepsy','Frontal Epilepsy']],y_label="Zscore",palette=sns.color_palette(["#FF0000", "#990000", "#660000"]),filename = 'zsocre_general_focal_frontal_epilepsy')
+
+def lesion_df(df,clinical_data_df,df_2sd_t):
+    df_e = df['Epilepsy'].dropna()
     # Lesion
     df2 = pd.DataFrame(
         {
-            "No Lesion": df[clinical_data_df['Lesion'] ==0]['Epilepsy'],
-            "Lesion": df[clinical_data_df['Lesion'] !=0]['Epilepsy'],
+            "No Lesion": df_e[clinical_data_df['Lesion'] ==0],
+            "Lesion": df_e[clinical_data_df['Lesion'] !=0],
         }
     )
     create_scientific_boxplot(df2,y_label="BBB%",palette=sns.color_palette(["#000000", "#FF0000"]),filename = 'BBB_lesion')
@@ -344,6 +375,13 @@ def plots(df,df_2sd,clinical_data_df,df_2sd_t):
         }
     )
     create_scientific_boxplot(df2,y_label="Zscore",palette=sns.color_palette(["#000000", "#FF0000"]),filename = 'zsocre_lesion')
+    str_paper = f"""
+    Regression analysis of brain volume in patients with epilepsy who have a lesion showed {df_e[clinical_data_df['Lesion'] !=0].mean():.2f}  ± {df_e[clinical_data_df['Lesion'] !=0].std():.2f}% of voxels exhibited BBBD,
+    while the average z-score for all regions was {df_2sd_t[clinical_data_df['Lesion'] !=0]['Epilepsy'].mean():.2f} ± {df_2sd_t[clinical_data_df['Lesion'] !=0]['Epilepsy'].std():.2f}.
+    In addition, regression analysis of brain volume in patients with epilepsy who do not have a lesion showed {df_e[clinical_data_df['Lesion'] ==0].mean():.2f}  ± {df_e[clinical_data_df['Lesion'] ==0].std():.2f}% of voxels exhibited BBBD,
+    while the average z-score for all regions was {df_2sd_t[clinical_data_df['Lesion'] ==0]['Epilepsy'].mean():.2f} ± {df_2sd_t[clinical_data_df['Lesion'] ==0]['Epilepsy'].std():.2f}.
+    """.replace('\n',' ')
+
 
 def medicine_df(clinical_data_df,result_mat_lin_age,df_126,controls_126_mean,controls_126_std):
     medications = ['Phenytoin', 'Divalproex', 'Lamotrigine', 'Levetiracetam', 'Ethosuximide', 'Perampanel', 'Brivaracetam', 'Gabapentin', 'Trileptin', 'Eslicarbazepine', 'Clobazam', 'Lacosamide', 'Zonisamide', 'Eslicarbazepine', 'Phenytoin', 'Topiramate']
@@ -378,6 +416,14 @@ def medicine_df(clinical_data_df,result_mat_lin_age,df_126,controls_126_mean,con
                        , "3+ medicines": df_126_mean.loc[[x>2 for x in med_list]].reset_index(drop=True)
                        })
     create_scientific_boxplot(df_126_med,y_label="Zscore",palette=sns.color_palette(["#FF0000", "#990000", "#660000"]),filename = 'zsocre_medications')
+    str_medicine_paper = f"""
+    Regression analysis of brain volume in patients with epilepsy who take 1 type of medicine showed {df_bbb['1 medicine'].mean():.2f}  ± {df_bbb['1 medicine'].std():.2f}% of voxels exhibited BBBD,
+    while the average z-score for all regions was {df_126_med['1 medicine'].mean():.2f}  ± {df_126_med['1 medicine'].std():.2f}%.
+    Additionally, the regression analysis of brain volume in patients with epilepsy who take 2 types of medicines showed {df_bbb['2 medicines'].mean():.2f}  ± {df_bbb['2 medicines'].std():.2f}% of voxels exhibited BBBD,
+    while the average z-score for all regions was {df_126_med['2 medicines'].mean():.2f}  ± {df_126_med['2 medicines'].std():.2f}%.
+    Finally, the regression analysis of brain volume in patients with epilepsy who take 3 or more types of medicines showed {df_bbb['3+ medicines'].mean():.2f}  ± {df_bbb['3+ medicines'].std():.2f}% of voxels exhibited BBBD,
+    while the average z-score for all regions was {df_126_med['3+ medicines'].mean():.2f}  ± {df_126_med['3+ medicines'].std():.2f}%.
+    """.replace('\n',' ')
     return med_list
 
 import pandas as pd
@@ -388,7 +434,7 @@ import plotting
 def create_scientific_boxplot(df_bbb,y_label="Value",palette="Set1",filename = 'a'):
     from scipy.stats import mannwhitneyu
     # Set the style
-    sns.set(style="whitegrid")
+    sns.set(style="white")
     # Create the boxplot
     plt.figure(figsize=(8, 6))
     font_size = 18
@@ -413,11 +459,11 @@ def create_scientific_boxplot(df_bbb,y_label="Value",palette="Set1",filename = '
                     y_height *= (1 + (.03 * num_lines))
                 except:
                     y_height = y_height
-                ax.plot([i, j], [y_height, y_height], color='black', linestyle='--', linewidth=1)
+                ax.plot([i, j], [y_height, y_height], color='gray', linestyle='-', linewidth=1)
                 # write number of * based on p value
                 astrixs = plotting.convert_pvalue_to_asterisks(p)
                 # Write above the middle of the line the asterisks
-                ax.text((i + j) / 2, y_height, astrixs, ha='center', va='center',fontsize=font_size)
+                ax.text((i + j) / 2, y_height, astrixs, ha='center', va='center',fontsize=font_size, color='gray')
     df_melted = df_bbb.melt(var_name='Medicine Count', value_name='Value')
     ax = sns.boxplot(data=df_bbb, palette=palette, width=0.7, boxprops=dict(facecolor=(1, 1, 1, 0)), showfliers=False)
     ax = sns.swarmplot(x='Medicine Count', y='Value', data=df_melted, hue='Medicine Count', palette=palette, facecolor='none')
@@ -437,10 +483,11 @@ def create_scientific_boxplot(df_bbb,y_label="Value",palette="Set1",filename = '
     # legend text size
     for text in legend.get_texts():
         text.set_fontsize(int(font_size*0.8))
-    # Save the plot as an image (e.g., in PDF or PNG format)
-    plt.savefig(f"figures/{filename}.png", dpi=900, bbox_inches="tight")
     # Display the plot
     plt.show(block=False)
+    # Save the plot as an image (e.g., in PDF or PNG format)
+    plt.savefig(f"figures/{filename}.png", dpi=900, bbox_inches="tight")
+
     pass
 
 
@@ -483,12 +530,16 @@ def results_paper_dyn():
     exponent2 = math.floor(math.log10(abs(p)))
     pass
     di = {}
+    di['controls'] = f"""
+    Regression analysis of brain volume in healthy controls revealed that {df['Controls'].mean():.2f} ± {df['Controls'].std():.2f}% of voxels exhibited BBBD,
+    while the average z-score for all regions was {controls_avg_regions.mean():.2f} ± {controls_avg_regions.std():.2f}%.
+    """.replace("\n", " ")
     di[
         "Patients with epilepsy"
     ] = f"""
     Regression analysis of brain volume using the in all patients with epilepsy revealed that {df['Epilepsy'].mean():.2f} ± {df['Epilepsy'].std():.2f}% of voxels exhibited BBBD,
-    while the mean standard deviation from the controls for all regions was {mat_lin_avg_regions.mean():.2f} ± {mat_lin_avg_regions.std():.2f}%.
-    Statistical comparisons demonstrated significant differences BBBD% between groups (p<10^{exponent}) as well as in the mean standard deviation from the controls for all regions (p<10^{exponent2}).
+    while the average z-score for all regions was {mat_lin_avg_regions.mean():.2f} ± {mat_lin_avg_regions.std():.2f}%.
+    Statistical comparisons demonstrated significant differences BBBD% between groups (p<10^{exponent}) as well as in the average z-score for all regions (p<10^{exponent2}).
     """.replace(
         "\n", " "
     )
@@ -520,11 +571,11 @@ def results_paper_dyn():
         "focal_generalized"
     ] = f"""
     Regression analysis of brain volume using the in focal epilepsy revealed that {df['Focal Epilepsy'].mean():.2f} ± {df['Focal Epilepsy'].std():.2f}% of voxels exhibited BBBD,
-    while the mean standard deviation from the controls for all regions was {focal_pat_mat_lin_avg_regions.mean():.2f} ± {focal_pat_mat_lin_avg_regions.std():.2f}%.
+    while the average z-score for all regions was {focal_pat_mat_lin_avg_regions.mean():.2f} ± {focal_pat_mat_lin_avg_regions.std():.2f}%.
     For generalized epilepsy, the regression analysis revealed that {df['Generalized Epilepsy'].mean():.2f} ± {df['Generalized Epilepsy'].std():.2f}% of voxels exhibited BBBD,
-    while the mean standard deviation from the controls for all regions was {general_pat_mat_lin_avg_regions.mean():.2f} ± {general_pat_mat_lin_avg_regions.std():.2f}%.
-    Statistical comparisons demonstrated significant differences in focal epilepsy compares to controls (p<10^{exponent}) as well as in the mean standard deviation from the controls for all regions (p<10^{exponent2}).
-    Statistical comparisons demonstrated significant differences in Generalized epilepsy compares to controls (p<10^{exponent3}) as well as in the mean standard deviation from the controls for all regions (p<10^{exponent4}).
+    while the average z-score for all regions was {general_pat_mat_lin_avg_regions.mean():.2f} ± {general_pat_mat_lin_avg_regions.std():.2f}%.
+    Statistical comparisons demonstrated significant differences in focal epilepsy compares to controls (p<10^{exponent}) as well as in the average z-score for all regions (p<10^{exponent2}).
+    Statistical comparisons demonstrated significant differences in Generalized epilepsy compares to controls (p<10^{exponent3}) as well as in the average z-score for all regions (p<10^{exponent4}).
     """.replace(
         "\n", " "
     )

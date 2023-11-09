@@ -231,7 +231,7 @@ if __name__ == "__main__":
         # tick fontsize
         plt.tick_params(labelsize=font_size*0.8)
         plt.xlabel("Region", fontsize=font_size, **font_name)
-        plt.grid(color="k", linewidth=0.5, axis="y")
+        # plt.grid(color="k", linewidth=0.5, axis="y")
         plt.show(block=False)
         plt.savefig("figures/" + title + ".png", bbox_inches="tight")
 
