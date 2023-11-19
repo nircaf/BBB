@@ -10,6 +10,7 @@ def get_folders():
     clinical_data = this_folder + r"\Epilepsy_clinical_data.xlsx"
     return files_location, excel_file, controls_file, clinical_data
 
+import stats
 
 def get_results():
     # this folder
@@ -117,7 +118,8 @@ def get_results():
     di[
         "paper"
     ] = f"""To conduct the study we included {len(Epilepsy_clinical_data)} epileptic patients (mean age = {di["age_mean"]:.2f} ±
-    {di["age_std"]:.2f}, {di['male_mean']*100:.2f}% male). And {len(controls_lin)} healthy controls (mean age = {controls_age.mean():.2f} ± {controls_age.std():.2f}, {100*di['male_mean_controls']:.2f}% male).
+    {di["age_std"]:.2f}, {di['male_mean']*100:.2f}% male).
+    And {len(controls_lin)} healthy controls (mean age = {controls_age.mean():.2f} ± {controls_age.std():.2f}, {100*di['male_mean_controls']:.2f}% male).
     Among the epileptic patients, {len(focal_epilepsy_age)} had focal epilepsy
     (mean age = {focal_epilepsy_age.mean():.2f} ± {focal_epilepsy_age.std():.2f}, {male_mean_f*100:.2f}% male),
     this group divides into {len(frontal_epilepsy)} frontal epileptic patients (mean age = {frontal_epilepsy_age.mean():.2f} ± {frontal_epilepsy_age.std():.2f}, {male_mean_frontal*100:.2f}% male),
@@ -132,8 +134,35 @@ def get_results():
     """.replace(
         "\n", " "
     )
+    import scipy.stats
+
+    # stip the "'" from columns
+    Epilepsy_clinical_data.columns = Epilepsy_clinical_data.columns.str.strip("'")
+    # df. index =  Age, Mean, Age at onset (years) Median (IQR), Epilepsy duration (years),Polytherapy. columns = Controls, Epilepsy, Focal Epilepsy, Generalized Epilepsy, Temporal Epilepsy, df	X2	P
+    df_table = pd.DataFrame(index=["Age (years)", "Age at onset (years)", "Epilepsy duration (years)"], columns=["Controls", "Epilepsy", "Focal Epilepsy", "Generalized Epilepsy", "Temporal Epilepsy", "Frontal Epilepsy","df","X2","P"])
+    df_table.loc['Age (years)', 'Controls'] = f"{controls_age.mean():.2f} ({controls_age.std():.2f})"
+    df_table.loc['Age (years)', 'Epilepsy'] = f"{Epilepsy_clinical_data['age'].mean():.2f} ({Epilepsy_clinical_data['age'].std():.2f})"
+    df_table.loc['Age (years)', 'Focal Epilepsy'] = f"{Epilepsy_clinical_data[Epilepsy_clinical_data['Focal/General'].str.contains('F')==True]['age'].mean():.2f} ({Epilepsy_clinical_data[Epilepsy_clinical_data['Focal/General'].str.contains('F')==True]['age'].std():.2f})"
+    df_table.loc['Age (years)', 'Generalized Epilepsy'] = f"{Epilepsy_clinical_data[Epilepsy_clinical_data['Focal/General'].str.contains('G')==True]['age'].mean():.2f} ({Epilepsy_clinical_data[Epilepsy_clinical_data['Focal/General'].str.contains('G')==True]['age'].std():.2f})"
+    df_table.loc['Age (years)', 'Frontal Epilepsy'] = f"{Epilepsy_clinical_data[Epilepsy_clinical_data['Focal Type'].str.contains('F')==True]['age'].mean():.2f} ({Epilepsy_clinical_data[Epilepsy_clinical_data['Focal Type'].str.contains('F')==True]['age'].std():.2f})"
+    df_table.loc['Age (years)', 'Temporal Epilepsy'] = f"{Epilepsy_clinical_data[Epilepsy_clinical_data['Focal Type'].str.contains('T')==True]['age'].mean():.2f} ({Epilepsy_clinical_data[Epilepsy_clinical_data['Focal Type'].str.contains('T')==True]['age'].std():.2f})"
+    df_table.loc['Gender, male %', 'Controls'] = f"{sum(control_gender=='M')/len(control_gender)*100:.2f}"
+    df_table.loc['Gender, male %', 'Epilepsy'] = f"{sum(epilepsy_gender=='M')/len(epilepsy_gender)*100:.2f}"
+    df_table.loc['Gender, male %', 'Focal Epilepsy'] = f"{epilepsy_gender[Epilepsy_clinical_data['Focal/General'].str.contains('F') == True].value_counts()['M']/len(Epilepsy_clinical_data[Epilepsy_clinical_data['Focal/General'].str.contains('F') == True])*100:.2f}"
+    df_table.loc['Gender, male %', 'Generalized Epilepsy'] = f"{epilepsy_gender[Epilepsy_clinical_data['Focal/General'].str.contains('G') == True].value_counts()['M']/len(Epilepsy_clinical_data[Epilepsy_clinical_data['Focal/General'].str.contains('G') == True])*100:.2f}"
+    df_table.loc['Gender, male %', 'Temporal Epilepsy'] = f"{epilepsy_gender[Epilepsy_clinical_data['Focal Type'].str.contains('T') == True].value_counts()['M']/len(Epilepsy_clinical_data[Epilepsy_clinical_data['Focal Type'].str.contains('T') == True])*100:.2f}"
+    df_table.loc['Age at onset (years)', 'Epilepsy'] = f"{Epilepsy_clinical_data['Age of oneset'].mean():.2f} ({Epilepsy_clinical_data['Age of oneset'].std():.2f})"
+    df_table.loc['Epilepsy duration (years)', 'Epilepsy'] = f"{Epilepsy_clinical_data['Year of epilepsy'].mean():.2f} ({Epilepsy_clinical_data['Year of epilepsy'].std():.2f})"
+    df_table.loc['Age at onset (years)', 'Focal Epilepsy'] = f"{Epilepsy_clinical_data[Epilepsy_clinical_data['Focal/General'].str.contains('F') == True]['Age of oneset'].mean():.2f} ({Epilepsy_clinical_data[Epilepsy_clinical_data['Focal/General'].str.contains('F') == True]['Age of oneset'].std():.2f})"
+    df_table.loc['Epilepsy duration (years)', 'Focal Epilepsy'] = f"{Epilepsy_clinical_data[Epilepsy_clinical_data['Focal/General'].str.contains('F') == True]['Year of epilepsy'].mean():.2f} ({Epilepsy_clinical_data[Epilepsy_clinical_data['Focal/General'].str.contains('F') == True]['Year of epilepsy'].std():.2f})"
+    df_table.loc['Age at onset (years)', 'Generalized Epilepsy'] = f"{Epilepsy_clinical_data[Epilepsy_clinical_data['Focal/General'].str.contains('G') == True]['Age of oneset'].mean():.2f} ({Epilepsy_clinical_data[Epilepsy_clinical_data['Focal/General'].str.contains('G') == True]['Age of oneset'].std():.2f})"
+    df_table.loc['Epilepsy duration (years)', 'Generalized Epilepsy'] = f"{Epilepsy_clinical_data[Epilepsy_clinical_data['Focal/General'].str.contains('G') == True]['Year of epilepsy'].mean():.2f} ({Epilepsy_clinical_data[Epilepsy_clinical_data['Focal/General'].str.contains('G') == True]['Year of epilepsy'].std():.2f})"
+    df_table.loc['Age at onset (years)', 'Frontal Epilepsy'] = f"{Epilepsy_clinical_data[Epilepsy_clinical_data['Focal Type'].str.contains('F') == True]['Age of oneset'].mean():.2f} ({Epilepsy_clinical_data[Epilepsy_clinical_data['Focal Type'].str.contains('F') == True]['Age of oneset'].std():.2f})"
+    df_table.loc['Epilepsy duration (years)', 'Frontal Epilepsy'] = f"{Epilepsy_clinical_data[Epilepsy_clinical_data['Focal Type'].str.contains('F') == True]['Year of epilepsy'].mean():.2f} ({Epilepsy_clinical_data[Epilepsy_clinical_data['Focal Type'].str.contains('F') == True]['Year of epilepsy'].std():.2f})"
+    df_table.loc['Age at onset (years)', 'Temporal Epilepsy'] = f"{Epilepsy_clinical_data[Epilepsy_clinical_data['Focal Type'].str.contains('T') == True]['Age of oneset'].mean():.2f} ({Epilepsy_clinical_data[Epilepsy_clinical_data['Focal Type'].str.contains('T') == True]['Age of oneset'].std():.2f})"
+    df_table.loc['Epilepsy duration (years)', 'Temporal Epilepsy'] = f"{Epilepsy_clinical_data[Epilepsy_clinical_data['Focal Type'].str.contains('T') == True]['Year of epilepsy'].mean():.2f} ({Epilepsy_clinical_data[Epilepsy_clinical_data['Focal Type'].str.contains('T') == True]['Year of epilepsy'].std():.2f})"
     # create df of result_mat_lin_age["y_target"] and controls_lin["Linear"]
-    df = pd.DataFrame(
+    df_BBB_percent = pd.DataFrame(
         {
             "Controls": controls_lin["Lin"],
             "Epilepsy": result_mat_lin_age["y_target"],
@@ -229,7 +258,7 @@ def get_results():
     )
     df_126 = df_126.drop(columns=["ID"])
     # for each row in result_mat_lin_age get % of areas above 2 sd of controls
-    df_2sd = pd.DataFrame(
+    df_2bbbd = pd.DataFrame(
         {
             "Controls": controls_126.apply(
                 lambda row: 100
@@ -269,6 +298,7 @@ def get_results():
             ).reset_index(drop=True),
         }
     )
+
     # for each row in result_mat_lin_age get % of areas above 2 sd of controls
     df_2sd = pd.DataFrame(
         {
@@ -304,27 +334,141 @@ def get_results():
             ).reset_index(drop=True).mean(),
         }
     )
-    df_2sd_t = pd.DataFrame({"Epilepsy": df_126.apply(
+    df_2sd_t = pd.DataFrame(
+        {
+            "Controls": controls_126.apply(
                 lambda row:
                  (row - controls_126_mean) / controls_126_std ,
                 axis=1,
-            ).reset_index(drop=True).mean(axis=1),}
-    )
-    df2 = pd.concat([df, df_2sd], axis=1)
-    # df to csv
-    # df_2sd.to_csv("figures/df_126_areas_mean.csv", index=False)
-    df.to_csv("figures/df_BBB_percent.csv", index=False)
-    medicine_df(clinical_data_df,result_mat_lin_age,df_126,controls_126_mean,controls_126_std)
-    plots(df,df_2sd)
-    return df, df_2sd
-    df_epilepsy = pd.DataFrame(
-        {
-            "Epilepsy": result_mat_lin_age["y_target"],
+            ).reset_index(drop=True).mean(axis=1),
+            "Epilepsy": df_126.apply(
+                lambda row:
+                 (row - controls_126_mean) / controls_126_std ,
+                axis=1,
+            ).reset_index(drop=True).mean(axis=1),
+            "Focal Epilepsy": df_126_focal.apply(
+                lambda row:
+                 (row - controls_126_mean) / controls_126_std ,
+                axis=1,
+            ).reset_index(drop=True).mean(axis=1),
+
+            "Generalized Epilepsy": df_126_general.apply(
+                lambda row:
+                 (row - controls_126_mean) / controls_126_std ,
+                axis=1,
+            ).reset_index(drop=True).mean(axis=1),
+            "Temporal Epilepsy": df_126_temporal.apply(
+                lambda row:
+                 (row - controls_126_mean) / controls_126_std ,
+                axis=1,
+            ).reset_index(drop=True).mean(axis=1),
         }
     )
-    result_mat_lin_age.to_csv("figures/df_epilepsy.csv", index=False)
-    df_126.to_csv("figures/df_126.csv", index=False)
+    df2 = pd.concat([df_BBB_percent, df_2sd], axis=1)
+    # df to csv
+    # df_2sd_t.to_csv("figures/df_126_areas_mean.csv", index=False)
+    # df_BBB_percent.to_csv("figures/df_BBB_percent.csv", index=False)
+    # df_2bbbd.to_csv("figures/bbbd_126_areas.csv", index=False)
+    # df_2sd.to_csv("figures/zscore126.csv", index=False)
+    # medicine_df(clinical_data_df,result_mat_lin_age,df_126,controls_126_mean,controls_126_std)
+    # plots(df,df_2sd)
+    return df_BBB_percent, df_2sd
+    df_table.loc['BBB%','Epilepsy'] = f"{df_BBB_percent['Epilepsy'].mean():.2f}% ({df_BBB_percent['Epilepsy'].std():.2f})"
+    df_table.loc['BBB%','Controls'] = f"{df_BBB_percent['Controls'].mean():.2f}% ({df_BBB_percent['Controls'].std():.2f})"
+    df_table.loc['BBB%','Focal Epilepsy'] = f"{df_BBB_percent['Focal Epilepsy'].mean():.2f}% ({df_BBB_percent['Focal Epilepsy'].std():.2f})"
+    df_table.loc['BBB%','Generalized Epilepsy'] = f"{df_BBB_percent['Generalized Epilepsy'].mean():.2f}% ({df_BBB_percent['Generalized Epilepsy'].std():.2f})"
+    df_table.loc['BBB%','Temporal Epilepsy'] = f"{df_BBB_percent['Temporal Epilepsy'].mean():.2f}% ({df_BBB_percent['Temporal Epilepsy'].std():.2f})"
+    df_table.loc['Z-score','Epilepsy'] = f"{df_2sd_t['Epilepsy'].mean():.2f} ({df_2sd_t['Epilepsy'].std():.2f})"
+    df_table.loc['Z-score','Controls'] = f"{df_2sd_t['Controls'].mean():.2f} ({df_2sd_t['Controls'].std():.2f})"
+    df_table.loc['Z-score','Focal Epilepsy'] = f"{df_2sd_t['Focal Epilepsy'].mean():.2f} ({df_2sd_t['Focal Epilepsy'].std():.2f})"
+    df_table.loc['Z-score','Generalized Epilepsy'] = f"{df_2sd_t['Generalized Epilepsy'].mean():.2f} ({df_2sd_t['Generalized Epilepsy'].std():.2f})"
+    df_table.loc['Z-score','Temporal Epilepsy'] = f"{df_2sd_t['Temporal Epilepsy'].mean():.2f} ({df_2sd_t['Temporal Epilepsy'].std():.2f})"
+    df_table.loc['% areas with BBBD','Epilepsy'] = f"{df_2bbbd['Epilepsy'].mean():.2f}% ({df_2bbbd['Epilepsy'].std():.2f})"
+    df_table.loc['% areas with BBBD','Controls'] = f"{df_2bbbd['Controls'].mean():.2f}% ({df_2bbbd['Controls'].std():.2f})"
+    df_table.loc['% areas with BBBD','Focal Epilepsy'] = f"{df_2bbbd['Focal Epilepsy'].mean():.2f}% ({df_2bbbd['Focal Epilepsy'].std():.2f})"
+    df_table.loc['% areas with BBBD','Generalized Epilepsy'] = f"{df_2bbbd['Generalized Epilepsy'].mean():.2f}% ({df_2bbbd['Generalized Epilepsy'].std():.2f})"
+    df_table.loc['% areas with BBBD','Temporal Epilepsy'] = f"{df_2bbbd['Temporal Epilepsy'].mean():.2f}% ({df_2bbbd['Temporal Epilepsy'].std():.2f})"
+    df_table.to_csv("figures/df_table.csv")
+    # df_2sd_t each value if above 2 sd put 1 else 0
+    df_2sd_t_above_2 = df_2sd_t.applymap(lambda x: 100 if x >= 2 else 0)
+    # where there is nan is df_2bbbd put nan in df_2sd_t_above_2
+    df_2sd_t_above_2[df_2bbbd.isna()] = np.nan
+    df_2sd_t_above_2.to_csv("figures/df_126_areas_mean_above_2.csv", index=False)
+    # df_2sd remove rows with nan
+    df_2sd = df_2sd.dropna()
+    df_2sd.to_csv("figures/df_126_areas_mean.csv", index=False)
 
+def pair_plot(df,df_2sd_t,df_2bbbd):
+    # pairplot
+    a = df['Epilepsy'].dropna().astype(float)
+    b = df_2bbbd['Epilepsy'].dropna().astype(float)
+    c = df_2sd_t['Epilepsy'].dropna().astype(float)
+    # pairplot with linear regression and text slope
+    g = sns.pairplot(
+        data=pd.DataFrame(
+            {
+                "BBBD": b,
+                "Zscore": c,
+                "BBB%": a,
+            }
+        ),
+        kind="reg",
+    )
+    # Add text with slope values
+    for ax in g.axes.flat:
+        for line in ax.lines:
+            slope = line.get_slope()
+            if slope is not None:
+                ax.annotate(f"Slope: {slope:.2f}",
+                            xy=(0.05, 0.95),
+                            xycoords=ax.transAxes,
+                            ha='left', va='top')
+            break
+
+def age_gender_ect(clinical_data_df,df_2sd_t,df):
+    """
+    Regression analysis of brain volume in patients with epilepsy who have a lesion showed 10.77 ± 7.81% of voxels exhibited BBBD, while the average z-score for all regions was 1.27 ± 1.41.
+    """
+    clinical_data_df["'gender'"] = clinical_data_df["'gender'"].str.strip("'")
+    gender_zscore = pd.DataFrame( {'Men': df_2sd_t['Epilepsy'].dropna()[clinical_data_df["'gender'"] == 'M'].reset_index(drop=True),
+    'Women': df_2sd_t['Epilepsy'].dropna()[clinical_data_df["'gender'"] == 'F'].reset_index(drop=True),}
+    )
+    gender_bbb = pd.DataFrame(
+        {'Men': df['Epilepsy'].dropna()[clinical_data_df["'gender'"] == 'M'].reset_index(drop=True),
+        'Women': df['Epilepsy'].dropna()[clinical_data_df["'gender'"] == 'F'].reset_index(drop=True),}
+    )
+    gender_bbb['Men'] = pd.to_numeric(gender_bbb['Men'], errors='coerce')
+    gender_bbb['Women'] = pd.to_numeric(gender_bbb['Women'], errors='coerce')
+    stat, p = mannwhitneyu(gender_bbb['Men'].dropna(), gender_bbb['Women'].dropna())
+    gender_zscore['Men'] = pd.to_numeric(gender_zscore['Men'], errors='coerce')
+    gender_zscore['Women'] = pd.to_numeric(gender_zscore['Women'], errors='coerce')
+    stat, p2 = mannwhitneyu(gender_zscore['Men'].dropna(), gender_zscore['Women'].dropna())
+    str_gender = f"""
+    Regression analysis of brain volume in men with epilepsy who have a lesion showed {gender_bbb['Men'].mean():.2f} ± {gender_bbb['Men'].std():.2f}% of voxels exhibited BBBD, while the average z-score for all regions was {gender_zscore['Men'].mean():.2f} ± {gender_zscore['Men'].std():.2f}.
+    Regression analysis of brain volume in women with epilepsy who have a lesion showed {gender_bbb['Women'].mean():.2f} ± {gender_bbb['Women'].std():.2f}% of voxels exhibited BBBD, while the average z-score for all regions was {gender_zscore['Women'].mean():.2f} ± {gender_zscore['Women'].std():.2f}.
+    Statistical comparison demonstrated insignificant differences in men compared to women of BBB% (p-value = {p2:.2f}) as well as in average z-score for all regions (p-value = {p:.2f}).
+    """.replace('\n',' ')
+    from scipy import stats
+    # Assuming 'age' and 'bbb' are your data
+    age = clinical_data_df["'age'"]
+    bbb = df['Epilepsy'].dropna().astype(float)
+    zscore = df_2sd_t['Epilepsy'].dropna().astype(float)
+    slope, intercept, r_value, p_value, std_err = stats.linregress(age, bbb)
+    slope2, intercept2, r_value2, p_value2, std_err2 = stats.linregress(age, zscore)
+    Age_of_onset = clinical_data_df['Age of oneset'].dropna().astype(float)
+    slope3, intercept3, r_value3, p_value3, std_err3 = stats.linregress(Age_of_onset, bbb)
+    slope33, intercept33, r_value33, p_value33, std_err33 = stats.linregress(Age_of_onset, zscore)
+    Year_of_epilepsy = clinical_data_df['Year of epilepsy'].dropna().astype(float)
+    slope4, intercept4, r_value4, p_value4, std_err4 = stats.linregress(Year_of_epilepsy, bbb)
+    slope44, intercept44, r_value44, p_value44, std_err44 = stats.linregress(Year_of_epilepsy, zscore)
+    str_age = f"""
+    Statistical comparison demonstrated insignificant differences between age and BBB% (p-value = {p_value:.2f}) as well as and averaged z-score for all regions (p-value = {p_value2:.2f}).
+    In addition, statistical comparison demonstrated insignificant differences between age of onset and BBB% (p-value = {p_value3:.2f}) as well as and averaged z-score for all regions (p-value = {p_value33:.2f}).
+    Finally, statistical comparison demonstrated insignificant differences between years of epilepsy and BBB% (p-value = {p_value4:.2f}) as well as and averaged z-score for all regions (p-value = {p_value44:.2f}).
+    """.replace('\n',' ')
+
+
+import numpy as np
 def most_penetrable_regions(df_2sd):
     region_epilepsy = df_2sd['Epilepsy'].sort_values(ascending=False).iloc[:10].apply(lambda x: round(x, 2))
     region_controls = df_2sd['Controls'].sort_values(ascending=False).iloc[:10]
@@ -358,22 +502,24 @@ def plots(df,df_2sd,clinical_data_df,df_2sd_t):
     create_scientific_boxplot(df[['Generalized Epilepsy','Focal Epilepsy','Frontal Epilepsy']],y_label="BBB%",palette=sns.color_palette(["#FF0000", "#990000", "#660000"]),filename = 'BBB_general_focal_frontal_epilepsy')
     create_scientific_boxplot(df_2sd[['Generalized Epilepsy','Focal Epilepsy','Frontal Epilepsy']],y_label="Zscore",palette=sns.color_palette(["#FF0000", "#990000", "#660000"]),filename = 'zsocre_general_focal_frontal_epilepsy')
 
-def lesion_df(df,clinical_data_df,df_2sd_t):
-    df_e = df['Epilepsy'].dropna()
+def lesion_df(df_2bbbd,clinical_data_df,df_2sd_t):
+    df_e = df_2bbbd['Epilepsy'].dropna()
     # Lesion
-    df2 = pd.DataFrame(
+    dfbbbd = pd.DataFrame(
         {
-            "No Lesion": df_e[clinical_data_df['Lesion'] ==0],
-            "Lesion": df_e[clinical_data_df['Lesion'] !=0],
+            "Non-lesional": df_e[clinical_data_df['Lesion'] ==0].reset_index(drop=True),
+            "Lesion": df_e[clinical_data_df['Lesion'] !=0].reset_index(drop=True),
         }
     )
-    create_scientific_boxplot(df2,y_label="BBB%",palette=sns.color_palette(["#000000", "#FF0000"]),filename = 'BBB_lesion')
     df2 = pd.DataFrame(
         {
-            "No Lesion": df_2sd_t[clinical_data_df['Lesion'] ==0]['Epilepsy'],
-            "Lesion": df_2sd_t[clinical_data_df['Lesion'] !=0]['Epilepsy'],
+            "Non-lesional": df_2sd_t['Epilepsy'].dropna()[clinical_data_df['Lesion'] ==0].reset_index(drop=True),
+            "Lesion": df_2sd_t['Epilepsy'].dropna()[clinical_data_df['Lesion'] !=0].reset_index(drop=True),
         }
     )
+    df_all = pd.concat([dfbbbd, df2], axis=1)
+    df_all.to_csv("figures/df_lesion.csv", index=False)
+    create_scientific_boxplot(dfbbbd,y_label="BBBD%",palette=sns.color_palette(["#000000", "#FF0000"]),filename = 'BBB_lesion')
     create_scientific_boxplot(df2,y_label="Zscore",palette=sns.color_palette(["#000000", "#FF0000"]),filename = 'zsocre_lesion')
     str_paper = f"""
     Regression analysis of brain volume in patients with epilepsy who have a lesion showed {df_e[clinical_data_df['Lesion'] !=0].mean():.2f}  ± {df_e[clinical_data_df['Lesion'] !=0].std():.2f}% of voxels exhibited BBBD,
@@ -383,9 +529,9 @@ def lesion_df(df,clinical_data_df,df_2sd_t):
     """.replace('\n',' ')
 
 
-def medicine_df(clinical_data_df,result_mat_lin_age,df_126,controls_126_mean,controls_126_std):
+def medicine_df(clinical_data_df,result_mat_lin_age,df_126,controls_126_mean,controls_126_std,df_2bbbd):
     medications = ['Phenytoin', 'Divalproex', 'Lamotrigine', 'Levetiracetam', 'Ethosuximide', 'Perampanel', 'Brivaracetam', 'Gabapentin', 'Trileptin', 'Eslicarbazepine', 'Clobazam', 'Lacosamide', 'Zonisamide', 'Eslicarbazepine', 'Phenytoin', 'Topiramate']
-    med_series = clinical_data_df["'Medications'"]
+    med_series = clinical_data_df["Medications"]
     # make list of how many medications each patient has
     med_list = []
     for meds in med_series:
@@ -395,34 +541,27 @@ def medicine_df(clinical_data_df,result_mat_lin_age,df_126,controls_126_mean,con
         else:
             # count how many items from list medications appear in meds
             med_list.append(len([x for x in medications if x in str(meds)]))
-    # get the inde of the last 0 in med_list
-    med_zero = 44
-    med_list = med_list[:min(result_mat_lin_age.shape[0],med_zero)]
-    result_mat_lin_age = result_mat_lin_age[:min(result_mat_lin_age.shape[0],med_zero)]
-    df_126_mean = df_126.apply(
-                lambda row:
-                (row - controls_126_mean) / controls_126_std ,
-                axis=1,
-            ).reset_index(drop=True).mean(axis=1)
-    df_126_mean = df_126_mean[:min(result_mat_lin_age.shape[0],med_zero)]
     # create df
-    df_bbb = pd.DataFrame({"1 medicine": result_mat_lin_age.loc[[x==1 for x in med_list],:]['y_target'].reset_index(drop=True)
-                       , "2 medicines": result_mat_lin_age.loc[[x==2 for x in med_list],:]['y_target'].reset_index(drop=True)
-                       , "3+ medicines": result_mat_lin_age.loc[[x>2 for x in med_list],:]['y_target'].reset_index(drop=True)
+    df_bbb = pd.DataFrame({"1": result_mat_lin_age.loc[[x==1 for x in med_list],:]['y_target'].reset_index(drop=True)
+                       , "2": result_mat_lin_age.loc[[x==2 for x in med_list],:]['y_target'].reset_index(drop=True)
+                       , "3+": result_mat_lin_age.loc[[x>2 for x in med_list],:]['y_target'].reset_index(drop=True)
                        })
+    df_2bbbd_e = df_2bbbd['Epilepsy'].dropna()
+    df_126_med = pd.DataFrame({"1": df_2bbbd_e.loc[[x==1 for x in med_list]].reset_index(drop=True)
+                       , "2": df_2bbbd_e.loc[[x==2 for x in med_list]].reset_index(drop=True)
+                       , "3+": df_2bbbd_e.loc[[x>2 for x in med_list]].reset_index(drop=True)
+                       })
+    df_all = pd.concat([df_bbb,df_126_med],axis=1)
+    df_all.to_csv("figures/df_medicines.csv", index=False)
     create_scientific_boxplot(df_bbb,y_label="BBB%",palette=sns.color_palette(["#FF0000", "#990000", "#660000"]),filename = 'BBB_medications')
-    df_126_med = pd.DataFrame({"1 medicine": df_126_mean.loc[[x==1 for x in med_list]].reset_index(drop=True)
-                       , "2 medicines": df_126_mean.loc[[x==2 for x in med_list]].reset_index(drop=True)
-                       , "3+ medicines": df_126_mean.loc[[x>2 for x in med_list]].reset_index(drop=True)
-                       })
     create_scientific_boxplot(df_126_med,y_label="Zscore",palette=sns.color_palette(["#FF0000", "#990000", "#660000"]),filename = 'zsocre_medications')
     str_medicine_paper = f"""
-    Regression analysis of brain volume in patients with epilepsy who take 1 type of medicine showed {df_bbb['1 medicine'].mean():.2f}  ± {df_bbb['1 medicine'].std():.2f}% of voxels exhibited BBBD,
-    while the average z-score for all regions was {df_126_med['1 medicine'].mean():.2f}  ± {df_126_med['1 medicine'].std():.2f}%.
-    Additionally, the regression analysis of brain volume in patients with epilepsy who take 2 types of medicines showed {df_bbb['2 medicines'].mean():.2f}  ± {df_bbb['2 medicines'].std():.2f}% of voxels exhibited BBBD,
-    while the average z-score for all regions was {df_126_med['2 medicines'].mean():.2f}  ± {df_126_med['2 medicines'].std():.2f}%.
-    Finally, the regression analysis of brain volume in patients with epilepsy who take 3 or more types of medicines showed {df_bbb['3+ medicines'].mean():.2f}  ± {df_bbb['3+ medicines'].std():.2f}% of voxels exhibited BBBD,
-    while the average z-score for all regions was {df_126_med['3+ medicines'].mean():.2f}  ± {df_126_med['3+ medicines'].std():.2f}%.
+    Regression analysis of brain volume in patients with epilepsy who take 1 type of medicine showed {df_bbb['1 medicine'].mean():.2f}  ± {df_bbb['1'].std():.2f}% of voxels exhibited BBBD,
+    while the average z-score for all regions was {df_126_med['1'].mean():.2f}  ± {df_126_med['1'].std():.2f}%.
+    Additionally, the regression analysis of brain volume in patients with epilepsy who take 2 types of medicines showed {df_bbb['2'].mean():.2f}  ± {df_bbb['2'].std():.2f}% of voxels exhibited BBBD,
+    while the average z-score for all regions was {df_126_med['2'].mean():.2f}  ± {df_126_med['2'].std():.2f}%.
+    Finally, the regression analysis of brain volume in patients with epilepsy who take 3 or more types of medicines showed {df_bbb['3+'].mean():.2f}  ± {df_bbb['3+'].std():.2f}% of voxels exhibited BBBD,
+    while the average z-score for all regions was {df_126_med['3+'].mean():.2f}  ± {df_126_med['3+'].std():.2f}%.
     """.replace('\n',' ')
     return med_list
 
@@ -430,6 +569,35 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import plotting
+from scipy.stats import mannwhitneyu
+
+
+def create_scientific_xyplot(df_bbb, y_label="Value", palette="Set1", filename = 'a',x_label="Medicine Count"):
+    # Set the style
+    sns.set(style="white")
+    # Create the scatterplot
+    plt.figure(figsize=(8, 6))
+    font_size = 18
+    df_melted = df_bbb.melt(var_name=x_label, value_name=y_label)
+    ax = sns.scatterplot(x=x_label, y=y_label, data=df_melted, palette=palette)
+    # Customize the plot
+    ax.set_ylabel(y_label, fontsize=font_size)
+    ax.tick_params(labelsize=font_size)
+    plt.xticks(fontsize=font_size)
+    plt.yticks(fontsize=font_size)
+    # remove x axis label
+    ax.set_xlabel(None)
+    # New code to remove the legend title
+    legend = ax.get_legend()
+    legend.set_title(None)
+    # legend text size
+    for text in legend.get_texts():
+        text.set_fontsize(int(font_size*0.8))
+    # Display the plot
+    plt.show(block=False)
+    # Save the plot as an image (e.g., in PDF or PNG format)
+    plt.savefig(f"figures/{filename}.png", dpi=900, bbox_inches="tight")
+    pass
 
 def create_scientific_boxplot(df_bbb,y_label="Value",palette="Set1",filename = 'a'):
     from scipy.stats import mannwhitneyu
@@ -487,7 +655,6 @@ def create_scientific_boxplot(df_bbb,y_label="Value",palette="Set1",filename = '
     plt.show(block=False)
     # Save the plot as an image (e.g., in PDF or PNG format)
     plt.savefig(f"figures/{filename}.png", dpi=900, bbox_inches="tight")
-
     pass
 
 

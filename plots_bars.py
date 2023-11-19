@@ -297,3 +297,7 @@ if __name__ == "__main__":
     # Create a translation table
     translation_table = str.maketrans("", "", "{'}")
     print(f"Regions legend: {str(dict_acronyzed_t).translate(translation_table)}")
+
+    # to csv concat df_lin_f and df_lin
+    df2 = pd.concat([df_lin, df_lin_f], axis=1)
+    df2.to_csv("figures/df_126_areas_all.csv", index=False)
