@@ -40,7 +40,7 @@ def extract_prism_files_from_pptx(pptx_path, output_folder='prism'):
             if shape.has_text_frame and 'prism' in shape.text_frame.text.lower():
                 # Assuming the object contains the word 'prism' in the text
                 prism_filename = f"{slide_number + 1}_{shape_number + 1}_prism.prism"
-                
+
                 # Save the Prism file to the output folder
                 prism_path = os.path.join(output_folder, prism_filename)
                 with open(prism_path, 'w') as prism_file:
