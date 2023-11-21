@@ -3,7 +3,7 @@ import os
 
 
 def get_folders():
-    this_folder = r"C:\Nir\BBB\BBB"
+    this_folder = os.getcwd()
     files_location = this_folder + r"\Excel not age gender match"
     excel_file = files_location + r"\epilepsy\merged.xlsx"
     controls_file = files_location + r"\controls\merged.xlsx"
@@ -134,7 +134,7 @@ def get_results():
     """.replace(
         "\n", " "
     )
-    import scipy.stats
+    import scipy.stats as stats
 
     # stip the "'" from columns
     Epilepsy_clinical_data.columns = Epilepsy_clinical_data.columns.str.strip("'")
@@ -144,13 +144,36 @@ def get_results():
     df_table.loc['Age (years)', 'Epilepsy'] = f"{Epilepsy_clinical_data['age'].mean():.2f} ({Epilepsy_clinical_data['age'].std():.2f})"
     df_table.loc['Age (years)', 'Focal Epilepsy'] = f"{Epilepsy_clinical_data[Epilepsy_clinical_data['Focal/General'].str.contains('F')==True]['age'].mean():.2f} ({Epilepsy_clinical_data[Epilepsy_clinical_data['Focal/General'].str.contains('F')==True]['age'].std():.2f})"
     df_table.loc['Age (years)', 'Generalized Epilepsy'] = f"{Epilepsy_clinical_data[Epilepsy_clinical_data['Focal/General'].str.contains('G')==True]['age'].mean():.2f} ({Epilepsy_clinical_data[Epilepsy_clinical_data['Focal/General'].str.contains('G')==True]['age'].std():.2f})"
-    df_table.loc['Age (years)', 'Frontal Epilepsy'] = f"{Epilepsy_clinical_data[Epilepsy_clinical_data['Focal Type'].str.contains('F')==True]['age'].mean():.2f} ({Epilepsy_clinical_data[Epilepsy_clinical_data['Focal Type'].str.contains('F')==True]['age'].std():.2f})"
     df_table.loc['Age (years)', 'Temporal Epilepsy'] = f"{Epilepsy_clinical_data[Epilepsy_clinical_data['Focal Type'].str.contains('T')==True]['age'].mean():.2f} ({Epilepsy_clinical_data[Epilepsy_clinical_data['Focal Type'].str.contains('T')==True]['age'].std():.2f})"
+    df_age = pd.DataFrame(
+        {
+            'Controls': controls_age,
+            'Epilepsy': Epilepsy_clinical_data['age'],
+            'Focal Epilepsy': Epilepsy_clinical_data[Epilepsy_clinical_data['Focal/General'].str.contains('F')==True]['age'],
+            'Generalized Epilepsy': Epilepsy_clinical_data[Epilepsy_clinical_data['Focal/General'].str.contains('G')==True]['age'],
+            'Temporal Epilepsy': Epilepsy_clinical_data[Epilepsy_clinical_data['Focal Type'].str.contains('T')==True]['age'],
+        }
+    )
+    # do ANOVA on df_age
+    f_val, p_val = stats.f_oneway(df_age['Controls'].dropna(), df_age['Epilepsy'].dropna(), df_age['Focal Epilepsy'].dropna(), df_age['Generalized Epilepsy'].dropna(), df_age['Temporal Epilepsy'].dropna())
+    df_table.loc['Age (years)', 'df'] = f"{len(df_age)-1}"
+    df_table.loc['Age (years)', 'F'] = f"{f_val:.2f}"
+    df_table.loc['Age (years)', 'P'] = f"{p_val:.2f}"
     df_table.loc['Gender, male %', 'Controls'] = f"{sum(control_gender=='M')/len(control_gender)*100:.2f}"
     df_table.loc['Gender, male %', 'Epilepsy'] = f"{sum(epilepsy_gender=='M')/len(epilepsy_gender)*100:.2f}"
     df_table.loc['Gender, male %', 'Focal Epilepsy'] = f"{epilepsy_gender[Epilepsy_clinical_data['Focal/General'].str.contains('F') == True].value_counts()['M']/len(Epilepsy_clinical_data[Epilepsy_clinical_data['Focal/General'].str.contains('F') == True])*100:.2f}"
     df_table.loc['Gender, male %', 'Generalized Epilepsy'] = f"{epilepsy_gender[Epilepsy_clinical_data['Focal/General'].str.contains('G') == True].value_counts()['M']/len(Epilepsy_clinical_data[Epilepsy_clinical_data['Focal/General'].str.contains('G') == True])*100:.2f}"
     df_table.loc['Gender, male %', 'Temporal Epilepsy'] = f"{epilepsy_gender[Epilepsy_clinical_data['Focal Type'].str.contains('T') == True].value_counts()['M']/len(Epilepsy_clinical_data[Epilepsy_clinical_data['Focal Type'].str.contains('T') == True])*100:.2f}"
+    df_gender = pd.DataFrame({'Controls': (control_gender=='M').astype(int),
+                            'Epilepsy': (epilepsy_gender=='M').astype(int),
+                            'Focal Epilepsy': (epilepsy_gender[Epilepsy_clinical_data['Focal/General'].str.contains('F') == True]=='M').astype(int),
+                            'Generalized Epilepsy': (epilepsy_gender[Epilepsy_clinical_data['Focal/General'].str.contains('G') == True]=='M').astype(int),
+                            'Temporal Epilepsy': (epilepsy_gender[Epilepsy_clinical_data['Focal Type'].str.contains('T') == True]=='M').astype(int),
+                            })
+    # Assuming df_gender is your DataFrame and 'Controls', 'Epilepsy', 'Focal Epilepsy', 'Generalized Epilepsy', 'Temporal Epilepsy' are your column names
+    observed = pd.concat([df_gender['Controls'].dropna().reset_index(drop=True), df_gender['Epilepsy'].dropna().reset_index(drop=True), df_gender['Focal Epilepsy'].dropna().reset_index(drop=True), df_gender['Generalized Epilepsy'].dropna().reset_index(drop=True), df_gender['Temporal Epilepsy'].dropna().reset_index(drop=True)], axis=1)
+    # Perform the Chi-Square test
+    chi2, p, dof, expected = stats.chi2_contingency(observed)
     df_table.loc['Age at onset (years)', 'Epilepsy'] = f"{Epilepsy_clinical_data['Age of oneset'].mean():.2f} ({Epilepsy_clinical_data['Age of oneset'].std():.2f})"
     df_table.loc['Epilepsy duration (years)', 'Epilepsy'] = f"{Epilepsy_clinical_data['Year of epilepsy'].mean():.2f} ({Epilepsy_clinical_data['Year of epilepsy'].std():.2f})"
     df_table.loc['Age at onset (years)', 'Focal Epilepsy'] = f"{Epilepsy_clinical_data[Epilepsy_clinical_data['Focal/General'].str.contains('F') == True]['Age of oneset'].mean():.2f} ({Epilepsy_clinical_data[Epilepsy_clinical_data['Focal/General'].str.contains('F') == True]['Age of oneset'].std():.2f})"
@@ -161,6 +184,21 @@ def get_results():
     df_table.loc['Epilepsy duration (years)', 'Frontal Epilepsy'] = f"{Epilepsy_clinical_data[Epilepsy_clinical_data['Focal Type'].str.contains('F') == True]['Year of epilepsy'].mean():.2f} ({Epilepsy_clinical_data[Epilepsy_clinical_data['Focal Type'].str.contains('F') == True]['Year of epilepsy'].std():.2f})"
     df_table.loc['Age at onset (years)', 'Temporal Epilepsy'] = f"{Epilepsy_clinical_data[Epilepsy_clinical_data['Focal Type'].str.contains('T') == True]['Age of oneset'].mean():.2f} ({Epilepsy_clinical_data[Epilepsy_clinical_data['Focal Type'].str.contains('T') == True]['Age of oneset'].std():.2f})"
     df_table.loc['Epilepsy duration (years)', 'Temporal Epilepsy'] = f"{Epilepsy_clinical_data[Epilepsy_clinical_data['Focal Type'].str.contains('T') == True]['Year of epilepsy'].mean():.2f} ({Epilepsy_clinical_data[Epilepsy_clinical_data['Focal Type'].str.contains('T') == True]['Year of epilepsy'].std():.2f})"
+    f_val, p_val = stats.f_oneway(Epilepsy_clinical_data['Age of oneset'].dropna(),
+                                   Epilepsy_clinical_data[Epilepsy_clinical_data['Focal/General'].str.contains('F') == True]['Age of oneset'].dropna()
+                                   ,Epilepsy_clinical_data[Epilepsy_clinical_data['Focal/General'].str.contains('G') == True]['Age of oneset'].dropna()
+                                   ,Epilepsy_clinical_data[Epilepsy_clinical_data['Focal Type'].str.contains('T') == True]['Age of oneset'].dropna())
+    df_table.loc['Age at onset (years)','df'] = 3
+    df_table.loc['Age at onset (years)','F'] = f_val
+    df_table.loc['Age at onset (years)','P'] = p_val
+    f_val, p_val = stats.f_oneway(Epilepsy_clinical_data['Year of epilepsy'].dropna(),
+                                   Epilepsy_clinical_data[Epilepsy_clinical_data['Focal/General'].str.contains('F') == True]['Year of epilepsy'].dropna()
+                                   ,Epilepsy_clinical_data[Epilepsy_clinical_data['Focal/General'].str.contains('G') == True]['Year of epilepsy'].dropna()
+                                   ,Epilepsy_clinical_data[Epilepsy_clinical_data['Focal Type'].str.contains('T') == True]['Year of epilepsy'].dropna())
+    df_table.loc['Epilepsy duration (years)','df'] = 3
+    df_table.loc['Epilepsy duration (years)','F'] = f_val
+    df_table.loc['Epilepsy duration (years)','P'] = p_val
+
     # create df of result_mat_lin_age["y_target"] and controls_lin["Linear"]
     df_BBB_percent = pd.DataFrame(
         {
