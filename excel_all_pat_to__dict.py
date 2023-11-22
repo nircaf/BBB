@@ -408,7 +408,7 @@ def get_results():
     # df_BBB_percent.to_csv("figures/df_BBB_percent.csv", index=False)
     # df_2bbbd.to_csv("figures/bbbd_126_areas.csv", index=False)
     # df_2sd.to_csv("figures/zscore126.csv", index=False)
-    # medicine_df(clinical_data_df,result_mat_lin_age,df_126,controls_126_mean,controls_126_std)
+    medicine_df(clinical_data_df,result_mat_lin_age,df_126,controls_126_mean,controls_126_std,df_2bbbd)
     # plots(df,df_2sd)
     return df_BBB_percent, df_2sd
     df_table.loc['BBB%','Epilepsy'] = f"{df_BBB_percent['Epilepsy'].mean():.2f}% ({df_BBB_percent['Epilepsy'].std():.2f})"
@@ -568,17 +568,25 @@ def lesion_df(df_2bbbd,clinical_data_df,df_2sd_t):
 
 
 def medicine_df(clinical_data_df,result_mat_lin_age,df_126,controls_126_mean,controls_126_std,df_2bbbd):
-    medications = ['Phenytoin', 'Divalproex', 'Lamotrigine', 'Levetiracetam', 'Ethosuximide', 'Perampanel', 'Brivaracetam', 'Gabapentin', 'Trileptin', 'Eslicarbazepine', 'Clobazam', 'Lacosamide', 'Zonisamide', 'Eslicarbazepine', 'Phenytoin', 'Topiramate']
+    medications = ['Phenytoin', 'Divalproex', 'Lamotrigine', 'Levetiracetam', 'Ethosuximide', 'Perampanel', 'Brivaracetam', 'Gabapentin', 'Trileptin', 'Eslicarbazepine', 'Clobazam', 'Lacosamide', 'Zonisamide', 'Eslicarbazepine', 'Topiramate','Frisium','Tegretol','Carbamazepine','OXCARBAZEPINE','Lorazepam']
+    # medications remove duplicates
+    medications =set(medications)
     med_series = clinical_data_df["Medications"]
     # make list of how many medications each patient has
     med_list = []
     for meds in med_series:
+        if meds != meds:
+            med_list.append(0)
+            continue
+        # meds remove duplicates of words
+        meds = ' '.join(set(meds.split(' ')))
         # input("Press enter to continue to the next iteration...")
         if pd.isna(meds):
             med_list.append(0)
         else:
             # count how many items from list medications appear in meds
             med_list.append(len([x for x in medications if x in str(meds)]))
+    pd.DataFrame(med_list).to_csv("figures/df_medications.csv", index=False)
     # create df
     df_bbb = pd.DataFrame({"1": result_mat_lin_age.loc[[x==1 for x in med_list],:]['y_target'].reset_index(drop=True)
                        , "2": result_mat_lin_age.loc[[x==2 for x in med_list],:]['y_target'].reset_index(drop=True)
@@ -592,7 +600,7 @@ def medicine_df(clinical_data_df,result_mat_lin_age,df_126,controls_126_mean,con
     df_all = pd.concat([df_bbb,df_126_med],axis=1)
     df_all.to_csv("figures/df_medicines.csv", index=False)
     create_scientific_boxplot(df_bbb,y_label="BBB%",palette=sns.color_palette(["#FF0000", "#990000", "#660000"]),filename = 'BBB_medications')
-    create_scientific_boxplot(df_126_med,y_label="Zscore",palette=sns.color_palette(["#FF0000", "#990000", "#660000"]),filename = 'zsocre_medications')
+    create_scientific_boxplot(df_126_med,y_label="%",palette=sns.color_palette(["#FF0000", "#990000", "#660000"]),filename = 'zsocre_medications')
     str_medicine_paper = f"""
     Regression analysis of brain volume in patients with epilepsy who take 1 type of medicine showed {df_bbb['1 medicine'].mean():.2f}  ± {df_bbb['1'].std():.2f}% of voxels exhibited BBBD,
     while the average z-score for all regions was {df_126_med['1'].mean():.2f}  ± {df_126_med['1'].std():.2f}%.
