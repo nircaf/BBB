@@ -156,7 +156,7 @@ def get_results():
     )
     # do ANOVA on df_age
     f_val, p_val = stats.f_oneway(df_age['Controls'].dropna(), df_age['Epilepsy'].dropna(), df_age['Focal Epilepsy'].dropna(), df_age['Generalized Epilepsy'].dropna(), df_age['Temporal Epilepsy'].dropna())
-    df_table.loc['Age (years)', 'df'] = f"{len(df_age)-1}"
+    df_table.loc['Age (years)', 'df'] = 3
     df_table.loc['Age (years)', 'F'] = f"{f_val:.2f}"
     df_table.loc['Age (years)', 'P'] = f"{p_val:.2f}"
     df_table.loc['Gender, female %', 'Controls'] = f"{sum(control_gender=='F')/len(control_gender)*100:.2f}"
@@ -433,6 +433,7 @@ def get_results():
     # df_2sd remove rows with nan
     df_2sd = df_2sd.dropna()
     df_2sd.to_csv("figures/df_126_areas_mean.csv", index=False)
+    result_mat_lin_age.to_csv("figures/result_mat_lin_age.csv", index=False)
 
 def pair_plot(df,df_2sd_t,df_2bbbd):
     # pairplot
@@ -555,13 +556,15 @@ def lesion_df(df_2bbbd,clinical_data_df,df_2sd_t):
     )
     df_all = pd.concat([dfbbbd, df2], axis=1)
     df_all.to_csv("figures/df_lesion.csv", index=False)
-    create_scientific_boxplot(dfbbbd,y_label="BBBD%",palette=sns.color_palette(["#000000", "#FF0000"]),filename = 'BBB_lesion')
-    create_scientific_boxplot(df2,y_label="Zscore",palette=sns.color_palette(["#000000", "#FF0000"]),filename = 'zsocre_lesion')
+    # create_scientific_boxplot(dfbbbd,y_label="BBBD%",palette=sns.color_palette(["#000000", "#FF0000"]),filename = 'BBB_lesion')
+    # create_scientific_boxplot(df2,y_label="Zscore",palette=sns.color_palette(["#000000", "#FF0000"]),filename = 'zsocre_lesion')
     str_paper = f"""
     Regression analysis of brain volume in patients with epilepsy who have a lesion showed {df_e[clinical_data_df['Lesion'] !=0].mean():.2f}  ± {df_e[clinical_data_df['Lesion'] !=0].std():.2f}% of voxels exhibited BBBD,
-    while the average z-score for all regions was {df_2sd_t[clinical_data_df['Lesion'] !=0]['Epilepsy'].mean():.2f} ± {df_2sd_t[clinical_data_df['Lesion'] !=0]['Epilepsy'].std():.2f}.
+    while the average z-score for all regions was {df_2sd_t['Epilepsy'].dropna()[clinical_data_df['Lesion'] !=0].mean():.2f} ± {df_2sd_t['Epilepsy'].dropna()[clinical_data_df['Lesion'] !=0].std():.2f}.
     In addition, regression analysis of brain volume in patients with epilepsy who do not have a lesion showed {df_e[clinical_data_df['Lesion'] ==0].mean():.2f}  ± {df_e[clinical_data_df['Lesion'] ==0].std():.2f}% of voxels exhibited BBBD,
-    while the average z-score for all regions was {df_2sd_t[clinical_data_df['Lesion'] ==0]['Epilepsy'].mean():.2f} ± {df_2sd_t[clinical_data_df['Lesion'] ==0]['Epilepsy'].std():.2f}.
+    while the average z-score for all regions was {df_2sd_t['Epilepsy'].dropna()[clinical_data_df['Lesion'] ==0].mean():.2f} ± {df_2sd_t['Epilepsy'].dropna()[clinical_data_df['Lesion'] ==0].std():.2f}.
+    Statistical comparison demonstrated insignificant differences between lesional and non-lesional patients in both percent of regions with BBBD (p={mannwhitneyu(df_e[clinical_data_df['Lesion'] !=0],df_e[clinical_data_df['Lesion'] ==0])[1]:.2f}),
+    and z-score (p={mannwhitneyu(df_2sd_t['Epilepsy'].dropna()[clinical_data_df['Lesion'] !=0],df_2sd_t['Epilepsy'].dropna()[clinical_data_df['Lesion'] ==0])[1]:.2f}).
     """.replace('\n',' ')
 
 
@@ -586,12 +589,16 @@ def medicine_df(clinical_data_df,result_mat_lin_age,df_126,controls_126_mean,con
             med_list.append(len([x for x in medications if x in str(meds)]))
     pd.DataFrame(med_list).to_csv("figures/df_medications.csv", index=False)
     # create df
-    df_bbb = pd.DataFrame({"1": result_mat_lin_age.loc[[x==1 for x in med_list],:]['y_target'].reset_index(drop=True)
+    pd.DataFrame({"1": clinical_data_df.loc[[x<=1 for x in med_list],:]['Seizure Frequency (/m)'].dropna().reset_index(drop=True),
+                       "2": clinical_data_df.loc[[x==2 for x in med_list],:]['Seizure Frequency (/m)'].dropna().reset_index(drop=True),
+                       "3+": clinical_data_df.loc[[x>2 for x in med_list],:]['Seizure Frequency (/m)'].dropna().reset_index(drop=True)
+                       }).to_csv("figures/df_seizure_freq.csv", index=False)
+    df_bbb = pd.DataFrame({"1": result_mat_lin_age.loc[[x<=1 for x in med_list],:]['y_target'].reset_index(drop=True)
                        , "2": result_mat_lin_age.loc[[x==2 for x in med_list],:]['y_target'].reset_index(drop=True)
                        , "3+": result_mat_lin_age.loc[[x>2 for x in med_list],:]['y_target'].reset_index(drop=True)
                        })
     df_2bbbd_e = df_2bbbd['Epilepsy'].dropna()
-    df_126_med = pd.DataFrame({"1": df_2bbbd_e.loc[[x==1 for x in med_list]].reset_index(drop=True)
+    df_126_med = pd.DataFrame({"1": df_2bbbd_e.loc[[x<=1 for x in med_list]].reset_index(drop=True)
                        , "2": df_2bbbd_e.loc[[x==2 for x in med_list]].reset_index(drop=True)
                        , "3+": df_2bbbd_e.loc[[x>2 for x in med_list]].reset_index(drop=True)
                        })
@@ -602,12 +609,28 @@ def medicine_df(clinical_data_df,result_mat_lin_age,df_126,controls_126_mean,con
     str_medicine_paper = f"""
     Regression analysis of brain volume in patients with epilepsy who take 1 type of medicine showed {df_bbb['1'].mean():.2f}  ± {df_bbb['1'].std():.2f}% of voxels exhibited BBBD,
     while the average z-score for all regions was {df_126_med['1'].mean():.2f}  ± {df_126_med['1'].std():.2f}%.
-    Additionally, the regression analysis of brain volume in patients with epilepsy who take 2 types of medicines showed {df_bbb['2'].mean():.2f}  ± {df_bbb['2'].std():.2f}% of voxels exhibited BBBD,
+    Additionally, the regression analysis of brain volume in patients with epilepsy who took 2 types of medicines showed {df_bbb['2'].mean():.2f}  ± {df_bbb['2'].std():.2f}% of voxels exhibited BBBD,
     while the average z-score for all regions was {df_126_med['2'].mean():.2f}  ± {df_126_med['2'].std():.2f}%.
-    Finally, the regression analysis of brain volume in patients with epilepsy who take 3 or more types of medicines showed {df_bbb['3+'].mean():.2f}  ± {df_bbb['3+'].std():.2f}% of voxels exhibited BBBD,
+    Finally, the regression analysis of brain volume in patients with epilepsy who took 3 or more types of medicines showed {df_bbb['3+'].mean():.2f}  ± {df_bbb['3+'].std():.2f}% of voxels exhibited BBBD,
     while the average z-score for all regions was {df_126_med['3+'].mean():.2f}  ± {df_126_med['3+'].std():.2f}%.
+    Statistical comparison demonstrated insignificant differences between patients who took 1 or less type of medicine and those who took 2 types of medicines
+    (p = {mannwhitneyu(df_bbb['1'].dropna(), df_bbb['2'].dropna())[1]:.2f}). In addition, statistical comparison demonstrated insignificant differences between patients who took 1 or less type of medicine and those who took 3 or more types of medicines
+    (p = {mannwhitneyu(df_bbb['1'].dropna(), df_bbb['3+'].dropna())[1]:.2f}). Finally, statistical comparison demonstrated insignificant differences between patients who took 2 types of medicines and those who took 3 or more types of medicines
+    (p = {mannwhitneyu(df_bbb['2'].dropna(), df_bbb['3+'].dropna())[1]:.2f}).
     """.replace('\n',' ')
     return med_list
+    # df above 10 y_target at result_mat_lin_age
+    df_above_10 = pd.DataFrame(
+        {
+            'High BBB%': result_mat_lin_age.loc[[x > 10 for x in result_mat_lin_age['y_target']], :][
+                'y_target'
+            ].reset_index(drop=True)
+            ,
+            'Low BBB%': result_mat_lin_age.loc[[x <= 10 for x in result_mat_lin_age['y_target']], :][
+                'y_target'
+            ].reset_index(drop=True)
+        }
+    )
 
 import pandas as pd
 import seaborn as sns
