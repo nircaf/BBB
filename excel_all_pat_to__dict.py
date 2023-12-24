@@ -434,6 +434,11 @@ def get_results():
     df_2sd = df_2sd.dropna()
     df_2sd.to_csv("figures/df_126_areas_mean.csv", index=False)
     result_mat_lin_age.to_csv("figures/result_mat_lin_age.csv", index=False)
+    df_126.apply(
+                lambda row:
+                 (row - controls_126_mean) / controls_126_std ,
+                axis=1,
+            ).reset_index(drop=True).mean(axis=0).to_csv("figures/df_126_areas_mean_zscore.csv")
 
 def pair_plot(df,df_2sd_t,df_2bbbd):
     # pairplot
