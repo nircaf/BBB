@@ -248,6 +248,13 @@ def get_results():
     controls_126_mean = controls_126.mean()
     controls_126_std = controls_126.std()
     df_126 = get_126_areas(clinical_data_df, result_mat_lin_age126)
+    df_126_all = df_126.drop(columns=["ID"])
+    df_percent_126 = pd.DataFrame({'ID': df_126['ID'], 'Epilepsy': df_126_all.apply(
+                lambda row: 100
+                * sum((row - controls_126_mean) / controls_126_std >= 2)
+                / len(controls_126_mean),
+                axis=1,
+            ).reset_index(drop=True)})
     df_126_focal = (
         df_126[
             df_126["ID"].isin(
@@ -439,6 +446,7 @@ def get_results():
                  (row - controls_126_mean) / controls_126_std ,
                 axis=1,
             ).reset_index(drop=True).mean(axis=0).to_csv("figures/df_126_areas_mean_zscore.csv")
+
 
 def pair_plot(df,df_2sd_t,df_2bbbd):
     # pairplot
@@ -831,6 +839,16 @@ def results_paper_dyn():
     The averaged z-score for focal and generalized PWE is:
     {result_str}
     """.replace("\n", " ")
+    di[
+        "focal_generalized"
+    ] = f"""
+    The regions with the averaged z-score across all PWE above 2 are: 
+    """
+    table_focal_generalized = pd.DataFrame({"Generalized": general_pat_mat_lin_avg_regions, "Focal": focal_pat_mat_lin_avg_regions})
+    # sort generalized
+    table_focal_generalized.sort_values(by=['Generalized'], ascending=False, inplace=True)
+    # to csv
+    table_focal_generalized.to_csv("figures/table_focal_generalized.csv")
     pass
 
 
@@ -988,10 +1006,38 @@ def merge_xlsx(path):
         with pd.ExcelWriter(excel_file_name, engine="openpyxl", mode="a") as writer:
             df_merged.to_excel(writer, sheet_name=sheet, index=False)
 
+def rand():
+    import numpy as np
+    from scipy.stats import chi2_contingency
+    from scipy.stats import ttest_ind
+
+    # Given data
+    divalproex = [0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0]
+    second_set = [0, 1, 0, 1, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 0, 0, 0]
+
+    # Organize data into a contingency table
+    contingency_table = np.array([divalproex, second_set])
+    # Convert lists to numpy arrays
+    contingency_table = np.array([np.array(xi) for xi in contingency_table])
+    # do ttest
+    t_stat, p_value = ttest_ind(divalproex, second_set)
+
+
+    chi2_stat, p_value, _, _ = chi2_contingency(contingency_table)
+    # Perform the chi-squared test
+    chi2_stat, p_value, _, _ = chi2_contingency(contingency_table)
+
+    # Set the significance level
+    alpha = 0.05
+
+    # Interpret the results
+    print(f"Chi-squared statistic: {chi2_stat}")
+    print(f"P-value: {p_value}")
+
 
 if __name__ == "__main__":
-    # merge_xlsx(path = r"C:\Nir\BBB\BBB\Excel not age gender match\controls")
-    # merge_xlsx(path = r"C:\Nir\BBB\BBB\Excel not age gender match\epilepsy")
+    # merge_xlsx(path = r"C:\Nir\BBB\2\BBB\Excel not age gender match\controls")
+    # merge_xlsx(path = r"C:\Nir\BBB\2\BBB\Excel not age gender match\epilepsy")
     results_paper_dyn()
     get_results()
     get_mat()
