@@ -197,6 +197,10 @@ def get_results():
     df_table.loc['Epilepsy duration , median, years (range)','F'] = f_val
     df_table.loc['Epilepsy duration , median, years (range)','P'] = p_val
 
+    df_table.loc['Lesional %', 'Epilepsy'] = 100*(Epilepsy_clinical_data['Lesion'] != 0).mean()
+    df_table.loc['Lesional %', 'Focal Epilepsy'] = 100*(Epilepsy_clinical_data[Epilepsy_clinical_data['Focal/General'].str.contains('F') == True]['Lesion'] != 0).mean()
+    df_table.loc['Lesional %', 'Generalized Epilepsy'] = 100*(Epilepsy_clinical_data[Epilepsy_clinical_data['Focal/General'].str.contains('G') == True]['Lesion'] != 0).mean()
+    df_table.loc['Lesional %', 'Temporal Epilepsy'] = 100*(Epilepsy_clinical_data[Epilepsy_clinical_data['Focal Type'].str.contains('T') == True]['Lesion'] != 0).mean()
     # create df of result_mat_lin_age["y_target"] and controls_lin["Linear"]
     df_BBB_percent = pd.DataFrame(
         {
@@ -304,39 +308,34 @@ def get_results():
     df_2bbbd = pd.DataFrame(
         {
             "Controls": controls_126.apply(
-                lambda row: 100
-                * sum((row - controls_126_mean) / controls_126_std >= 2)
-                / len(controls_126_mean),
+                lambda row:
+                sum((row - controls_126_mean) / controls_126_std >= 2)
+                ,
                 axis=1,
             ).reset_index(drop=True),
             "Epilepsy": df_126.apply(
-                lambda row: 100
-                * sum((row - controls_126_mean) / controls_126_std >= 2)
-                / len(controls_126_mean),
+                lambda row:  sum((row - controls_126_mean) / controls_126_std >= 2)
+                ,
                 axis=1,
             ).reset_index(drop=True),
             "Focal Epilepsy": df_126_focal.apply(
-                lambda row: 100
-                * sum((row - controls_126_mean) / controls_126_std >= 2)
-                / len(controls_126_mean),
+                lambda row:  sum((row - controls_126_mean) / controls_126_std >= 2)
+                ,
                 axis=1,
             ).reset_index(drop=True),
             "Generalized Epilepsy": df_126_general.apply(
-                lambda row: 100
-                * sum((row - controls_126_mean) / controls_126_std >= 2)
-                / len(controls_126_mean),
+                lambda row:  sum((row - controls_126_mean) / controls_126_std >= 2)
+                ,
                 axis=1,
             ).reset_index(drop=True),
             "Frontal Epilepsy": df_126_frontal.apply(
-                lambda row: 100
-                * sum((row - controls_126_mean) / controls_126_std >= 2)
-                / len(controls_126_mean),
+                lambda row:  sum((row - controls_126_mean) / controls_126_std >= 2)
+                ,
                 axis=1,
             ).reset_index(drop=True),
             "Temporal Epilepsy": df_126_temporal.apply(
-                lambda row: 100
-                * sum((row - controls_126_mean) / controls_126_std >= 2)
-                / len(controls_126_mean),
+                lambda row:  sum((row - controls_126_mean) / controls_126_std >= 2)
+                ,
                 axis=1,
             ).reset_index(drop=True),
         }
@@ -416,6 +415,11 @@ def get_results():
     # medicine_df(clinical_data_df,result_mat_lin_age,df_126,controls_126_mean,controls_126_std,df_2bbbd)
     # plots(df,df_2sd)
     return df_BBB_percent, df_2sd
+    str_paper = f"""
+    On regional analysis, PWE had on the average {df_2bbbd['Epilepsy'].mean():.2f} ± {df_2bbbd['Epilepsy'].std():.2f}
+    brain regions with BBBD
+    """.replace("\n", "")
+    f""" {df_2bbbd['Controls'].mean():.2f} ± {df_2bbbd['Controls'].std():.2f}    """.replace("\n", "")
     df_table.loc['BBB%','Epilepsy'] = f"{df_BBB_percent['Epilepsy'].mean():.2f}% ({df_BBB_percent['Epilepsy'].std():.2f})"
     df_table.loc['BBB%','Controls'] = f"{df_BBB_percent['Controls'].mean():.2f}% ({df_BBB_percent['Controls'].std():.2f})"
     df_table.loc['BBB%','Focal Epilepsy'] = f"{df_BBB_percent['Focal Epilepsy'].mean():.2f}% ({df_BBB_percent['Focal Epilepsy'].std():.2f})"
@@ -432,6 +436,9 @@ def get_results():
     df_table.loc['% areas with BBBD','Generalized Epilepsy'] = f"{df_2bbbd['Generalized Epilepsy'].mean():.2f}% ({df_2bbbd['Generalized Epilepsy'].std():.2f})"
     df_table.loc['% areas with BBBD','Temporal Epilepsy'] = f"{df_2bbbd['Temporal Epilepsy'].mean():.2f}% ({df_2bbbd['Temporal Epilepsy'].std():.2f})"
     df_table.to_csv("figures/df_table.csv")
+    f""" Regional analysis revealed {sum(df_2sd['Focal Epilepsy']>=2)} regions the focal group compared with {sum(df_2sd['Generalized Epilepsy']>=2)} regions in the generalized group with a Z >2
+    Interestingly, patients clinically diagnosed with suspected temporal lobe epilepsy had {sum(df_2sd['Temporal Epilepsy']>=2)} regions with a Z score > 2
+    """.replace("\n", "")
     # df_2sd_t each value if above 2 sd put 1 else 0
     df_2sd_t_above_2 = df_2sd_t.applymap(lambda x: 100 if x >= 2 else 0)
     # where there is nan is df_2bbbd put nan in df_2sd_t_above_2
@@ -571,6 +578,8 @@ def lesion_df(df_2bbbd,clinical_data_df,df_2sd_t):
     df_all.to_csv("figures/df_lesion.csv", index=False)
     # create_scientific_boxplot(dfbbbd,y_label="BBBD%",palette=sns.color_palette(["#000000", "#FF0000"]),filename = 'BBB_lesion')
     # create_scientific_boxplot(df2,y_label="Zscore",palette=sns.color_palette(["#000000", "#FF0000"]),filename = 'zsocre_lesion')
+    f""" {df2['Lesion'].mean():.2f} ± {df2['Lesion'].std():.2f} vs {df2['Non-lesional'].mean():.2f} ± {df2['Non-lesional'].std():.2f}, p={mannwhitneyu(df2['Lesion'].dropna(),df2['Non-lesional'].dropna())[1]:.2f}"""
+    f""" {dfbbbd['Lesion'].mean():.2f} ± {dfbbbd['Lesion'].std():.2f} vs {dfbbbd['Non-lesional'].mean():.2f} ± {dfbbbd['Non-lesional'].std():.2f}, p={mannwhitneyu(dfbbbd['Lesion'].dropna(),dfbbbd['Non-lesional'].dropna())[1]:.2f}"""
     str_paper = f"""
     Regression analysis of brain volume in patients with epilepsy who have a lesion showed {df_e[clinical_data_df['Lesion'] !=0].mean():.2f}  ± {df_e[clinical_data_df['Lesion'] !=0].std():.2f}% of voxels exhibited BBBD,
     while the average z-score for all regions was {df_2sd_t['Epilepsy'].dropna()[clinical_data_df['Lesion'] !=0].mean():.2f} ± {df_2sd_t['Epilepsy'].dropna()[clinical_data_df['Lesion'] !=0].std():.2f}.
@@ -579,9 +588,10 @@ def lesion_df(df_2bbbd,clinical_data_df,df_2sd_t):
     Statistical comparison demonstrated insignificant differences between lesional and non-lesional patients in both percent of regions with BBBD (p={mannwhitneyu(df_e[clinical_data_df['Lesion'] !=0],df_e[clinical_data_df['Lesion'] ==0])[1]:.2f}),
     and z-score (p={mannwhitneyu(df_2sd_t['Epilepsy'].dropna()[clinical_data_df['Lesion'] !=0],df_2sd_t['Epilepsy'].dropna()[clinical_data_df['Lesion'] ==0])[1]:.2f}).
     """.replace('\n',' ')
+    dfbbbd.to_csv("figures/df_lesion.csv", index=False)
 
 
-def medicine_df(clinical_data_df,result_mat_lin_age,df_126,controls_126_mean,controls_126_std,df_2bbbd):
+def medicine_df(clinical_data_df,result_mat_lin_age,df_126,controls_126_mean,controls_126_std,df_2bbbd,df_2sd_t):
     medications = ['Phenytoin', 'Divalproex', 'Lamotrigine', 'Levetiracetam', 'Ethosuximide', 'Perampanel', 'Brivaracetam', 'Gabapentin', 'Trileptin', 'Eslicarbazepine', 'Clobazam', 'Lacosamide', 'Zonisamide', 'Eslicarbazepine', 'Topiramate','Frisium','Tegretol','Carbamazepine','OXCARBAZEPINE','Lorazepam']
     # medications remove duplicates
     medications =set(medications)
@@ -615,35 +625,37 @@ def medicine_df(clinical_data_df,result_mat_lin_age,df_126,controls_126_mean,con
                        , "2": df_2bbbd_e.loc[[x==2 for x in med_list]].reset_index(drop=True)
                        , "3+": df_2bbbd_e.loc[[x>2 for x in med_list]].reset_index(drop=True)
                        })
+    zscore_med = pd.DataFrame({"1": df_2sd_t['Epilepsy'].dropna().loc[[x<=1 for x in med_list]].reset_index(drop=True),
+                       "2": df_2sd_t['Epilepsy'].dropna().loc[[x==2 for x in med_list]].reset_index(drop=True),
+                       "3+": df_2sd_t['Epilepsy'].dropna().loc[[x>2 for x in med_list]].reset_index(drop=True)
+                       })
     df_all = pd.concat([df_bbb,df_126_med],axis=1)
     df_all.to_csv("figures/df_medicines.csv", index=False)
     # create_scientific_boxplot(df_bbb,y_label="BBB%",palette=sns.color_palette(["#FF0000", "#990000", "#660000"]),filename = 'BBB_medications')
     # create_scientific_boxplot(df_126_med,y_label="%",palette=sns.color_palette(["#FF0000", "#990000", "#660000"]),filename = 'zsocre_medications')
-    str_medicine_paper = f"""
-    Regression analysis of brain volume in patients with epilepsy who take 1 type of medicine showed {df_bbb['1'].mean():.2f}  ± {df_bbb['1'].std():.2f}% of voxels exhibited BBBD,
-    while the average z-score for all regions was {df_126_med['1'].mean():.2f}  ± {df_126_med['1'].std():.2f}%.
-    Additionally, the regression analysis of brain volume in patients with epilepsy who took 2 types of medicines showed {df_bbb['2'].mean():.2f}  ± {df_bbb['2'].std():.2f}% of voxels exhibited BBBD,
-    while the average z-score for all regions was {df_126_med['2'].mean():.2f}  ± {df_126_med['2'].std():.2f}%.
-    Finally, the regression analysis of brain volume in patients with epilepsy who took 3 or more types of medicines showed {df_bbb['3+'].mean():.2f}  ± {df_bbb['3+'].std():.2f}% of voxels exhibited BBBD,
-    while the average z-score for all regions was {df_126_med['3+'].mean():.2f}  ± {df_126_med['3+'].std():.2f}%.
-    Statistical comparison demonstrated insignificant differences between patients who took 1 or less type of medicine and those who took 2 types of medicines
-    (p = {mannwhitneyu(df_bbb['1'].dropna(), df_bbb['2'].dropna())[1]:.2f}). In addition, statistical comparison demonstrated insignificant differences between patients who took 1 or less type of medicine and those who took 3 or more types of medicines
-    (p = {mannwhitneyu(df_bbb['1'].dropna(), df_bbb['3+'].dropna())[1]:.2f}). Finally, statistical comparison demonstrated insignificant differences between patients who took 2 types of medicines and those who took 3 or more types of medicines
-    (p = {mannwhitneyu(df_bbb['2'].dropna(), df_bbb['3+'].dropna())[1]:.2f}).
-    """.replace('\n',' ')
+    f""" {df_126_med['1'].mean():.2f} ± {df_126_med['1'].std():.2f}, {df_126_med['2'].mean():.2f} ± {df_126_med['2'].std():.2f} and {df_126_med['3+'].mean():.2f} ± {df_126_med['3+'].std():.2f} """
+    f""" {zscore_med['1'].mean():.2f} ± {zscore_med['1'].std():.2f}, {zscore_med['2'].mean():.2f} ± {zscore_med['2'].std():.2f} and {zscore_med['3+'].mean():.2f} ± {zscore_med['3+'].std():.2f} """
+    from scipy.stats import f_oneway
+    # Assuming zscore_med is your DataFrame
+    f_val, p_val = f_oneway(zscore_med['1'].dropna(), zscore_med['2'].dropna(), zscore_med['3+'].dropna())
+    # run on df_126_med
+    # Assuming df_126_med is your DataFrame
+    f_val2, p_val2 = f_oneway(df_126_med['1'].dropna(), df_126_med['2'].dropna(), df_126_med['3+'].dropna())
     return med_list
+    median_lin = result_mat_lin_age['y_target'].median()
     # df above 10 y_target at result_mat_lin_age
     df_above_10 = pd.DataFrame(
         {
-            'High BBB%': result_mat_lin_age.loc[[x > 10 for x in result_mat_lin_age['y_target']], :][
+            'High BBB%': result_mat_lin_age.loc[[x > median_lin for x in result_mat_lin_age['y_target']], :][
                 'y_target'
             ].reset_index(drop=True)
             ,
-            'Low BBB%': result_mat_lin_age.loc[[x <= 10 for x in result_mat_lin_age['y_target']], :][
+            'Low BBB%': result_mat_lin_age.loc[[x <= median_lin for x in result_mat_lin_age['y_target']], :][
                 'y_target'
             ].reset_index(drop=True)
         }
     )
+    f""" {df_above_10['High BBB%'].mean():.2f} ± {df_above_10['High BBB%'].std():.2f}, {df_above_10['Low BBB%'].mean():.2f} ± {df_above_10['Low BBB%'].std():.2f} """
 
 import pandas as pd
 import seaborn as sns
@@ -752,19 +764,10 @@ def results_paper_dyn():
     focal_pat_mat_tofts = mat["focal_pat_mat_tofts"]
     general_pat_mat_lin = mat["general_pat_mat_lin"]
     general_pat_mat_tofts = mat["general_pat_mat_tofts"]
-    controls_avg_regions = (
-        (mat_lin_control - mat_lin_control.mean(axis=0)) / mat_lin_control.std(axis=0)
-    ).mean()
-    mat_lin_avg_regions = (
-        (mat_lin - mat_lin_control.mean(axis=0)) / mat_lin_control.std(axis=0)
-    ).mean()
-    focal_pat_mat_lin_avg_regions = (
-        (focal_pat_mat_lin - mat_lin_control.mean(axis=0)) / mat_lin_control.std(axis=0)
-    ).mean()
-    general_pat_mat_lin_avg_regions = (
-        (general_pat_mat_lin - mat_lin_control.mean(axis=0))
-        / mat_lin_control.std(axis=0)
-    ).mean()
+    controls_avg_regions = ((mat_lin_control - mat_lin_control.mean(axis=0)) / mat_lin_control.std(axis=0) >= 2).sum(axis=1)
+    mat_lin_avg_regions = ((mat_lin - mat_lin_control.mean(axis=0)) / mat_lin_control.std(axis=0) >= 2).sum(axis=1)
+    focal_pat_mat_lin_avg_regions = ((focal_pat_mat_lin - mat_lin_control.mean(axis=0)) / mat_lin_control.std(axis=0) >= 2).sum(axis=1)
+    general_pat_mat_lin_avg_regions = ((general_pat_mat_lin - mat_lin_control.mean(axis=0)) / mat_lin_control.std(axis=0) >= 2).sum(axis=1)
     # mann whitney df['Epilepsy'], df['Controls']
     df["Epilepsy"] = pd.to_numeric(df["Epilepsy"], errors="coerce")
     df["Controls"] = pd.to_numeric(df["Controls"], errors="coerce")
@@ -785,6 +788,7 @@ def results_paper_dyn():
     Regression analysis of brain volume using the in all patients with epilepsy revealed that {df['Epilepsy'].mean():.2f} ± {df['Epilepsy'].std():.2f}% of voxels exhibited BBBD,
     while the averaged percent of regions with BBBD for all regions was {mat_lin_avg_regions.mean():.2f} ± {mat_lin_avg_regions.std():.2f}%.
     Statistical comparisons demonstrated significant differences BBBD% between groups (p<10^{exponent}) as well as in the averaged percent of regions with BBBD for all regions (p<10^{exponent2}).
+    with at least one brain region with BBBD in {100*sum(mat_lin_avg_regions>1)/len(mat_lin_avg_regions)}
     """.replace("\n", " ")
     # mann whitney df['Focal Epilepsy'], df['Controls']
     df["Focal Epilepsy"] = pd.to_numeric(df["Focal Epilepsy"], errors="coerce")
@@ -793,7 +797,7 @@ def results_paper_dyn():
     exponent = math.floor(math.log10(abs(p)))
     # mann whitney df['Epilepsy'], df['Controls']
     d1 = pd.to_numeric(focal_pat_mat_lin_avg_regions, errors="coerce")
-    d2 = pd.to_numeric(controls_avg_regions, errors="coerce")
+    d2 = pd.to_numeric(general_pat_mat_lin_avg_regions, errors="coerce")
     stats, p = mannwhitneyu(d1.dropna(), d2.dropna())
     exponent2 = math.floor(math.log10(abs(p)))
     # mann whitney df['Generalized Epilepsy'], df['Controls']
@@ -812,9 +816,9 @@ def results_paper_dyn():
     exponent4 = math.floor(math.log10(abs(p)))
     di["focal_generalized"] = f"""
     Regression analysis of brain volume using the in focal epilepsy revealed that {df['Focal Epilepsy'].mean():.2f} ± {df['Focal Epilepsy'].std():.2f}% of voxels exhibited BBBD,
-    while the average z-score for all regions was {focal_pat_mat_lin_avg_regions.mean():.2f} ± {focal_pat_mat_lin_avg_regions.std():.2f}%.
+    while {focal_pat_mat_lin_avg_regions.mean():.2f} ± {focal_pat_mat_lin_avg_regions.std():.2f}.
     For generalized epilepsy, the regression analysis revealed that {df['Generalized Epilepsy'].mean():.2f} ± {df['Generalized Epilepsy'].std():.2f}% of voxels exhibited BBBD,
-    while the average z-score for all regions was {general_pat_mat_lin_avg_regions.mean():.2f} ± {general_pat_mat_lin_avg_regions.std():.2f}%.
+    while {general_pat_mat_lin_avg_regions.mean():.2f} ± {general_pat_mat_lin_avg_regions.std():.2f}.
     Statistical comparisons demonstrated significant differences in focal epilepsy compares to controls (p<10^{exponent}) as well as in the average z-score for all regions (p<10^{exponent2}).
     Statistical comparisons demonstrated significant differences in Generalized epilepsy compares to controls (p<10^{exponent3}) as well as in the average z-score for all regions (p<10^{exponent4}).
     """.replace(
@@ -842,7 +846,7 @@ def results_paper_dyn():
     di[
         "focal_generalized"
     ] = f"""
-    The regions with the averaged z-score across all PWE above 2 are: 
+    The regions with the averaged z-score across all PWE above 2 are:
     """
     table_focal_generalized = pd.DataFrame({"Generalized": general_pat_mat_lin_avg_regions, "Focal": focal_pat_mat_lin_avg_regions})
     # sort generalized
