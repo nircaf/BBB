@@ -292,6 +292,22 @@ def get_results():
         .reset_index(drop=True)
         .drop(columns=["ID"])
     )
+    # do mannwhitneyu test on each column general vs df_126_focal
+    df_manu = pd.DataFrame()
+    for col in df_126_general.columns:
+        # Convert the columns to numeric type before dropping NA values and running the test
+        df_126_general[col] = pd.to_numeric(df_126_general[col], errors='coerce')
+        df_126_focal[col] = pd.to_numeric(df_126_focal[col], errors='coerce')
+        df_126_all[col] = pd.to_numeric(df_126_all[col], errors='coerce')
+        controls_126[col] = pd.to_numeric(controls_126[col], errors='coerce')
+        try:
+            # print(mannwhitneyu(df_126_general[col].dropna(), df_126_focal[col].dropna()))
+            # df_manu[col] = mannwhitneyu(df_126_general[col].dropna(), df_126_focal[col].dropna())
+            df_manu[col] = mannwhitneyu(df_126_all[col].dropna(), controls_126[col].dropna())
+        except:
+            pass
+    # print sum df_manu row 1 is less than 0.05
+    print(sum(df_manu.iloc[1,:]< 0.05))
     df_126_temporal = (
         df_126[
             df_126["ID"].isin(
@@ -407,6 +423,7 @@ def get_results():
         }
     )
     df2 = pd.concat([df_BBB_percent, df_2sd], axis=1)
+    # num_regions_to_plots(clinical_data_df)
     # df to csv
     # df_2sd_t.to_csv("figures/df_126_areas_mean.csv", index=False)
     # df_BBB_percent.to_csv("figures/df_BBB_percent.csv", index=False)
@@ -414,46 +431,126 @@ def get_results():
     # df_2sd.to_csv("figures/zscore126.csv", index=False)
     # medicine_df(clinical_data_df,result_mat_lin_age,df_126,controls_126_mean,controls_126_std,df_2bbbd)
     # plots(df,df_2sd)
+    def matching_bbb_clinical():
+        df = pd.DataFrame()
+        di = {'frontal': 0, 'temporal': 0, 'generalized': 0,'occipital':0,'parietal':0}
+        di_sum = {'frontal': 0, 'temporal': 0, 'generalized': 0,'occipital':0,'parietal':0}
+        for index,row in Epilepsy_clinical_data.iterrows():
+            code =row['code']
+            ftype = row['Focal Type']
+            areas = result_mat_lin_age126[result_mat_lin_age126["'ID'"]==code.strip("'")].drop(columns=["'ID'"])
+            # strip "'" from areas index
+            areas = areas.rename(columns=lambda x: x.strip("'")).T
+            areas_above_controls = (areas.iloc[:,0] - controls_126_mean) / controls_126_std
+            if ftype != ftype:
+                continue
+                if row['Focal/General'].find('G') != -1:
+                    di_sum['generalized'] += 1
+                    # if more than 50% of areas_above_controls are above 2 sd of controls
+                    if sum(areas_above_controls > 2)/len(areas_above_controls) > 0.5:
+                        di['generalized'] += 1
+                    df = pd.concat([df,areas_above_controls],axis=1)
+                    continue
+            if ftype.find('R') != -1:
+                side = 'Right'
+            elif ftype.find('L') != -1:
+                side = 'Left'
+            else:
+                side = ' '
+            # if ftype contains T
+            if ftype.find('T') != -1:
+                # find index in areas with "temporal"
+                lobe = 'temporal'
+            if ftype.find('F') != -1:
+                # find index in areas with "frontal"
+                lobe = 'frontal'
+            if ftype.find('O') != -1:
+                # find index in areas with "occipital"
+                lobe = 'occipital'
+            if ftype.find('P') != -1:
+                # find index in areas with "parietal"
+                lobe = 'parietal'
+            q_areas = areas_above_controls[areas_above_controls.index.str.contains(lobe)]
+            q_areas = q_areas[q_areas.index.str.contains(side)]
+            # if sum(q_areas > 2)/len(q_areas) > 0.5:
+            #     di[lobe] += 1
+            di_sum[lobe] += 1
+            di[lobe] += 1 if any(q_areas >= 2) else 0
+            df = pd.concat([df,q_areas],axis=1)
+        print(sum(di.values())/sum(di_sum.values()))
+        di = {k: 100*v / di_sum[k] for k, v in di.items()}
+        df.to_csv("figures/matching_bbb_clinical.csv")
+    # Example usage
+    plot_shap_feature_importance(clinical_data_df, '# regions with BBBD')
     return df_BBB_percent, df_2sd
-    str_paper = f"""
-    On regional analysis, PWE had on the average {df_2bbbd['Epilepsy'].mean():.2f} ± {df_2bbbd['Epilepsy'].std():.2f}
-    brain regions with BBBD
-    """.replace("\n", "")
-    f""" {df_2bbbd['Controls'].mean():.2f} ± {df_2bbbd['Controls'].std():.2f}    """.replace("\n", "")
-    df_table.loc['BBB%','Epilepsy'] = f"{df_BBB_percent['Epilepsy'].mean():.2f}% ({df_BBB_percent['Epilepsy'].std():.2f})"
-    df_table.loc['BBB%','Controls'] = f"{df_BBB_percent['Controls'].mean():.2f}% ({df_BBB_percent['Controls'].std():.2f})"
-    df_table.loc['BBB%','Focal Epilepsy'] = f"{df_BBB_percent['Focal Epilepsy'].mean():.2f}% ({df_BBB_percent['Focal Epilepsy'].std():.2f})"
-    df_table.loc['BBB%','Generalized Epilepsy'] = f"{df_BBB_percent['Generalized Epilepsy'].mean():.2f}% ({df_BBB_percent['Generalized Epilepsy'].std():.2f})"
-    df_table.loc['BBB%','Temporal Epilepsy'] = f"{df_BBB_percent['Temporal Epilepsy'].mean():.2f}% ({df_BBB_percent['Temporal Epilepsy'].std():.2f})"
-    df_table.loc['Z-score','Epilepsy'] = f"{df_2sd_t['Epilepsy'].mean():.2f} ({df_2sd_t['Epilepsy'].std():.2f})"
-    df_table.loc['Z-score','Controls'] = f"{df_2sd_t['Controls'].mean():.2f} ({df_2sd_t['Controls'].std():.2f})"
-    df_table.loc['Z-score','Focal Epilepsy'] = f"{df_2sd_t['Focal Epilepsy'].mean():.2f} ({df_2sd_t['Focal Epilepsy'].std():.2f})"
-    df_table.loc['Z-score','Generalized Epilepsy'] = f"{df_2sd_t['Generalized Epilepsy'].mean():.2f} ({df_2sd_t['Generalized Epilepsy'].std():.2f})"
-    df_table.loc['Z-score','Temporal Epilepsy'] = f"{df_2sd_t['Temporal Epilepsy'].mean():.2f} ({df_2sd_t['Temporal Epilepsy'].std():.2f})"
-    df_table.loc['% areas with BBBD','Epilepsy'] = f"{df_2bbbd['Epilepsy'].mean():.2f}% ({df_2bbbd['Epilepsy'].std():.2f})"
-    df_table.loc['% areas with BBBD','Controls'] = f"{df_2bbbd['Controls'].mean():.2f}% ({df_2bbbd['Controls'].std():.2f})"
-    df_table.loc['% areas with BBBD','Focal Epilepsy'] = f"{df_2bbbd['Focal Epilepsy'].mean():.2f}% ({df_2bbbd['Focal Epilepsy'].std():.2f})"
-    df_table.loc['% areas with BBBD','Generalized Epilepsy'] = f"{df_2bbbd['Generalized Epilepsy'].mean():.2f}% ({df_2bbbd['Generalized Epilepsy'].std():.2f})"
-    df_table.loc['% areas with BBBD','Temporal Epilepsy'] = f"{df_2bbbd['Temporal Epilepsy'].mean():.2f}% ({df_2bbbd['Temporal Epilepsy'].std():.2f})"
-    df_table.to_csv("figures/df_table.csv")
-    f""" Regional analysis revealed {sum(df_2sd['Focal Epilepsy']>=2)} regions the focal group compared with {sum(df_2sd['Generalized Epilepsy']>=2)} regions in the generalized group with a Z >2
-    Interestingly, patients clinically diagnosed with suspected temporal lobe epilepsy had {sum(df_2sd['Temporal Epilepsy']>=2)} regions with a Z score > 2
-    """.replace("\n", "")
-    # df_2sd_t each value if above 2 sd put 1 else 0
-    df_2sd_t_above_2 = df_2sd_t.applymap(lambda x: 100 if x >= 2 else 0)
-    # where there is nan is df_2bbbd put nan in df_2sd_t_above_2
-    df_2sd_t_above_2[df_2bbbd.isna()] = np.nan
-    df_2sd_t_above_2.to_csv("figures/df_126_areas_mean_above_2.csv", index=False)
-    # df_2sd remove rows with nan
-    df_2sd = df_2sd.dropna()
-    df_2sd.to_csv("figures/df_126_areas_mean.csv", index=False)
-    result_mat_lin_age.to_csv("figures/result_mat_lin_age.csv", index=False)
-    df_126.apply(
-                lambda row:
-                 (row - controls_126_mean) / controls_126_std ,
-                axis=1,
-            ).reset_index(drop=True).mean(axis=0).to_csv("figures/df_126_areas_mean_zscore.csv")
 
+def num_regions_to_plots(clinical_data_df):
+
+    clinical_data_df.columns
+    # clinical_data_df['gender'] drop '
+    clinical_data_df['gender'] = clinical_data_df['gender'].str.strip("'")
+    # clinical_data_df['gender'], change F to 1 and M to 0
+    clinical_data_df['gender'] = clinical_data_df['gender'].map({'F': 1, 'M': 0})
+    # high_bbb_group bigger than median
+    high_bbb_group = clinical_data_df[clinical_data_df["BBB%"] > clinical_data_df["BBB%"].median()]
+    # low_bbb_group smaller than median
+    low_bbb_group = clinical_data_df[clinical_data_df["BBB%"] <= clinical_data_df["BBB%"].median()]
+    cols_to_run = ['Year of epilepsy','Age of oneset','age','Seizure Frequency (/m)','gender']
+    for col in cols_to_run:
+        lowbbb= pd.to_numeric(low_bbb_group[col], errors='coerce').dropna().reset_index(drop=True)
+        highbbb = pd.to_numeric(high_bbb_group[col], errors='coerce').dropna().reset_index(drop=True)
+        df = pd.concat([highbbb, lowbbb], axis=1)
+        # rename columns
+        df.columns = ['High BBBD', 'Low BBBD']
+        # boxplot Year of epilepsy
+        if col == 'Seizure Frequency (/m)':
+            col = 'Seizure Frequency'
+        create_scientific_boxplot(df,y_label=col,palette=sns.color_palette(["#000000", "#FF0000"]),filename = col)
+
+import shap
+import xgboost as xgb
+import matplotlib.pyplot as plt
+
+def plot_shap_feature_importance(clinical_data_df, target_column):
+    clinical_data_df.columns
+    features = ['Focal/General', 'Focal Type', 'age', 'gender', 
+                 'Epilepsy type', 'Seizures type', 'Medications', 'Number of medications', 'Divalproex', 'Tegretol',
+                   'Levetiracetam', 'Lamotrigine', 'Divalproex.1', 'Lacosamide', 'Family History', 'Age of oneset', 'Year of epilepsy',
+                     'Seizure Frequency (/m)', 'Number of medication','Lesion','EEG']
+    df2 = clinical_data_df[features]
+    # Splitting the data into features and target
+    # Select non-numeric columns
+    non_numeric_columns = df2.select_dtypes(include=['object', 'category']).columns
+
+    # Apply one-hot encoding to non-numeric columns
+    X = pd.get_dummies(df2, columns=non_numeric_columns, drop_first=True)
+    # true =1 false =0
+    X = X.replace({True: 1, False: 0})
+    y = clinical_data_df[target_column]
+    # y drop na
+    y = y.dropna()
+    # x same number of rows as y
+    X = X.iloc[:len(y)]
+    # Train a model (XGBoost in this case)
+    model = xgb.XGBRegressor()
+    model.fit(X, y)
+    # Calculate SHAP values
+    explainer = shap.Explainer(model, X)
+    shap_values = explainer(X)
+    # Plot the SHAP values
+    shap.summary_plot(shap_values, X, plot_type="bar")
+    return
+
+
+def bar_plot(df,y_label,palette,filename):
+    # df columns to float
+    df = df.astype(float)
+    # sns bar plot 
+    plt.figure(figsize=(10, 6))
+    df.plot(kind='bar', color=palette, legend=False)
+    plt.ylabel(y_label)
+    plt.savefig(f'figures/{filename}.png', dpi=600, bbox_inches='tight',transparent=True, pad_inches=0.2, quality=95)
+    plt.close()
 
 def pair_plot(df,df_2sd_t,df_2bbbd):
     # pairplot
