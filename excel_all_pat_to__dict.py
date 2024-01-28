@@ -1,5 +1,29 @@
 import pandas as pd
 import os
+import numpy as np
+
+def read_all_excels(directory='Volume'):
+    def get_excels(sheet_name):
+        dataframes = {}
+        df_p = pd.DataFrame()
+        for excel_file in excel_files:
+            df = pd.read_excel(os.path.join(directory, excel_file), sheet_name=sheet_name)
+            dataframes[excel_file] = df
+            df2 = pd.DataFrame()
+            df2[excel_file.strip('.xlsx')] = df.drop(columns=['ID']).mean()
+            df_p = pd.concat([df_p, df2], axis=1)
+        return df_p
+    # Get all files in the directory
+    files = os.listdir(directory)
+    # Filter for Excel files
+    excel_files = [f for f in files if f.endswith('.xlsx') or f.endswith('.xls')]
+    # Read each Excel file into a DataFrame and store them in a dictionary
+    df_p = get_excels('%')
+    create_scientific_boxplot(df_p,y_label="%, Volume",filename = 'Volume')
+    df_p = get_excels('Cm3')
+    create_scientific_boxplot(df_p,y_label="Cm3",filename = 'Cm3')
+    return df_p
+
 
 
 def get_folders():
@@ -249,8 +273,8 @@ def get_results():
         columns=["'ID'"]
     )
     controls_126.columns = controls_126.columns.str.strip("'")
-    controls_126_mean = controls_126.mean()
-    controls_126_std = controls_126.std()
+    controls_126_mean = controls_126.median()
+    controls_126_std = controls_126.apply(lambda x: np.mean(np.abs(x - controls_126_mean[x.name])))
     df_126 = get_126_areas(clinical_data_df, result_mat_lin_age126)
     df_126_all = df_126.drop(columns=["ID"])
     df_percent_126 = pd.DataFrame({'ID': df_126['ID'], 'Epilepsy': df_126_all.apply(
@@ -431,10 +455,12 @@ def get_results():
     # df_2sd.to_csv("figures/zscore126.csv", index=False)
     # medicine_df(clinical_data_df,result_mat_lin_age,df_126,controls_126_mean,controls_126_std,df_2bbbd)
     # plots(df,df_2sd)
-    def matching_bbb_clinical():
+    def matching_bbb_clinical(Epilepsy_clinical_data):
+        Epilepsy_clinical_data = Epilepsy_clinical_data[Epilepsy_clinical_data['Focal/General'].notna()]
         df = pd.DataFrame()
         di = {'frontal': 0, 'temporal': 0, 'generalized': 0,'occipital':0,'parietal':0}
         di_sum = {'frontal': 0, 'temporal': 0, 'generalized': 0,'occipital':0,'parietal':0}
+        di_contra = {'frontal': 0, 'temporal': 0, 'generalized': 0,'occipital':0,'parietal':0}
         for index,row in Epilepsy_clinical_data.iterrows():
             code =row['code']
             ftype = row['Focal Type']
@@ -456,33 +482,74 @@ def get_results():
             elif ftype.find('L') != -1:
                 side = 'Left'
             else:
+                continue
                 side = ' '
-            # if ftype contains T
-            if ftype.find('T') != -1:
-                # find index in areas with "temporal"
-                lobe = 'temporal'
-            if ftype.find('F') != -1:
-                # find index in areas with "frontal"
-                lobe = 'frontal'
-            if ftype.find('O') != -1:
-                # find index in areas with "occipital"
-                lobe = 'occipital'
-            if ftype.find('P') != -1:
-                # find index in areas with "parietal"
-                lobe = 'parietal'
-            q_areas = areas_above_controls[areas_above_controls.index.str.contains(lobe)]
-            q_areas = q_areas[q_areas.index.str.contains(side)]
-            # if sum(q_areas > 2)/len(q_areas) > 0.5:
-            #     di[lobe] += 1
-            di_sum[lobe] += 1
-            di[lobe] += 1 if any(q_areas >= 2) else 0
-            df = pd.concat([df,q_areas],axis=1)
+            # run over ftype letters TFOP
+            for letter in re.findall("[TFOP]", ftype):
+                # if ftype contains T
+                if letter == 'T':
+                    # find index in areas with "temporal"
+                    lobe = 'temporal'
+                elif letter == 'F':
+                    # find index in areas with "frontal"
+                    lobe = 'frontal'
+                elif letter == 'O':
+                    # find index in areas with "occipital"
+                    lobe = 'occipital'
+                elif letter == 'P':
+                    # find index in areas with "parietal"
+                    lobe = 'parietal'
+                q_areas = areas_above_controls[areas_above_controls.index.str.contains(lobe)]
+                q_areas = q_areas[q_areas.index.str.contains(side)]
+                # if sum(q_areas > 2)/len(q_areas) > 0.5:
+                #     di[lobe] += 1
+                di_sum[lobe] += 1
+                di[lobe] += 1 if any(q_areas >= 2) else 0
+                if side != ' ':
+                    other_side = 'Left' if side == 'Right' else 'Right'
+                    q_areas = areas_above_controls[areas_above_controls.index.str.contains(lobe)]
+                    q_areas = q_areas[q_areas.index.str.contains(other_side)]
+                    di_contra[lobe] += 1 if any(q_areas >= 2) else 0
+                df = pd.concat([df,q_areas],axis=1)
         print(sum(di.values())/sum(di_sum.values()))
-        di = {k: 100*v / di_sum[k] for k, v in di.items()}
+        di = {k: 100*v / di_sum[k] if di_sum[k] != 0 else 0 for k, v in di.items()}
+        di_contra = {k: 100*v / di_sum[k] if di_sum[k] != 0 else 0 for k, v in di_contra.items()}
         df.to_csv("figures/matching_bbb_clinical.csv")
     # Example usage
-    plot_shap_feature_importance(clinical_data_df, '# regions with BBBD')
+    # plot_shap_feature_importance(clinical_data_df, '# regions with BBBD')
+    matching_bbb_clinical(Epilepsy_clinical_data)
     return df_BBB_percent, df_2sd
+
+import re
+def tonic_clonic(Epilepsy_clinical_data):
+    Epilepsy_clinical_data2 = Epilepsy_clinical_data.iloc[:Epilepsy_clinical_data["Seizures type"].dropna().str.contains("TCS").shape[0]]
+    df = pd.DataFrame(
+        {
+            "TCS": Epilepsy_clinical_data2[Epilepsy_clinical_data2["Seizures type"].dropna().str.contains("TCS")]['# regions with BBBD'].reset_index(drop=True),
+            "Non-TCS": Epilepsy_clinical_data2[~Epilepsy_clinical_data2["Seizures type"].dropna().str.contains("TCS")]['# regions with BBBD'].reset_index(drop=True),
+        }
+    )
+    create_scientific_boxplot(df,y_label="#, Regions",filename = 'Tonic_clonic')
+
+def facility(clinical_data_df,df_2bbbd):
+    clinical_data_df2 = clinical_data_df[clinical_data_df['Focal/General'].notna()]
+    df = pd.DataFrame(
+        {
+        'BGU': clinical_data_df2[clinical_data_df2["Facility"].dropna().str.contains("BGU")]['# regions with BBBD'].reset_index(drop=True),
+        'DAL': clinical_data_df2[clinical_data_df2["Facility"].dropna().str.contains("DAL")]['# regions with BBBD'].reset_index(drop=True),
+        'TRI': clinical_data_df2[clinical_data_df2["Facility"].dropna().str.contains("TRI")]['# regions with BBBD'].reset_index(drop=True),
+        'UCL': clinical_data_df2[clinical_data_df2["Facility"].dropna().str.contains("UCL")]['# regions with BBBD'].reset_index(drop=True),
+        }
+    )
+    create_scientific_boxplot(df,y_label="#, Regions",filename = 'Facility')
+    df = pd.DataFrame(
+        {
+            'BGU': df_2bbbd['Controls'].iloc[:43].reset_index(drop=True),
+            'UCL': df_2bbbd['Controls'].iloc[43:50].reset_index(drop=True),
+            'DAL': df_2bbbd['Controls'].iloc[50:].reset_index(drop=True),
+        }
+    )
+    create_scientific_boxplot(df,y_label="#, Regions",filename = 'Facility_controls')
 
 def num_regions_to_plots(clinical_data_df):
 
@@ -650,10 +717,10 @@ def merge_regions_sides(df):
     df = df.groupby(df.index).max()
     return df
 
-def plots(df,df_2sd,clinical_data_df,df_2sd_t):
-    create_scientific_boxplot(df[['Controls','Epilepsy']],y_label="BBB%",palette=sns.color_palette(["#000000", "#FF0000"]),filename = 'BBB_controls_epilepsy')
+def plots(df_2bbbd,df_2sd,clinical_data_df,df_2sd_t):
+    create_scientific_boxplot(df_2bbbd[['Controls','Epilepsy']],y_label="#, Regions",palette=sns.color_palette(["#000000", "#FF0000"]),filename = 'BBB_controls_epilepsy')
     create_scientific_boxplot(df_2sd[['Controls','Epilepsy']],y_label="Zscore",palette=sns.color_palette(["#000000", "#FF0000"]),filename = 'zsocre_controls_epilepsy')
-    create_scientific_boxplot(df[['Generalized Epilepsy','Focal Epilepsy','Frontal Epilepsy']],y_label="BBB%",palette=sns.color_palette(["#FF0000", "#990000", "#660000"]),filename = 'BBB_general_focal_frontal_epilepsy')
+    create_scientific_boxplot(df_2bbbd[['Generalized Epilepsy','Focal Epilepsy','Frontal Epilepsy']],y_label="#, Regions",palette=sns.color_palette(["#FF0000", "#990000", "#660000"]),filename = 'BBB_general_focal_frontal_epilepsy')
     create_scientific_boxplot(df_2sd[['Generalized Epilepsy','Focal Epilepsy','Frontal Epilepsy']],y_label="Zscore",palette=sns.color_palette(["#FF0000", "#990000", "#660000"]),filename = 'zsocre_general_focal_frontal_epilepsy')
 
 def lesion_df(df_2bbbd,clinical_data_df,df_2sd_t):
@@ -805,6 +872,7 @@ def create_scientific_boxplot(df_bbb,y_label="Value",palette="Set1",filename = '
             data1 = data1.astype(float)
             data2 = data2.astype(float)
             stat, p = mannwhitneyu(data1, data2)
+            print(f"{df_bbb.columns[i]} vs. {df_bbb.columns[j]}: U-statistic={stat:.2f}, p-value={p:.4f}")
             if p<0.05:
                 # Add a line between the two boxes
                 ax = plt.gca()
@@ -869,6 +937,7 @@ def results_paper_dyn():
     df["Epilepsy"] = pd.to_numeric(df["Epilepsy"], errors="coerce")
     df["Controls"] = pd.to_numeric(df["Controls"], errors="coerce")
     stats, p = mannwhitneyu(df["Epilepsy"].dropna(), df["Controls"].dropna())
+    
     exponent = math.floor(math.log10(abs(p)))
     # mann whitney df['Epilepsy'], df['Controls']
     d1 = pd.to_numeric(mat_lin_avg_regions, errors="coerce")
