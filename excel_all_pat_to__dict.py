@@ -589,14 +589,14 @@ def num_regions_to_plots(clinical_data_df):
         # boxplot Year of epilepsy
         if col == 'Seizure Frequency (/m)':
             col = 'Seizure Frequency'
-        # if df col 0,1 is linear significant 
-        # if df col 0,1 is linear significant 
+        # if df col 0,1 is linear significant
+        # if df col 0,1 is linear significant
         correlation, p_value = pearsonr(df.iloc[:, 0].fillna(df.iloc[:, 0].median()), df.iloc[:, 1])
         if p_value < 0.05:
             print(f'The relationship between {df.columns[0]} and {df.columns[1]} is significantly linear. p={p_value}')
         else:
             print(f'The relationship between {df.columns[0]} and {df.columns[1]} is not significantly linear. p={p_value}')
-                
+
 
 import shap
 import xgboost as xgb
@@ -608,7 +608,7 @@ def pca_bbbd(clinical_data_df):
     df = tonic_clonic(clinical_data_df)
     number_of_regions = clinical_data_df['# regions with BBBD'].dropna().astype(int).reset_index(drop=True)
     if all_features:
-        features = ['Seizure Frequency (/m)', 'Number of medication','Age of oneset','Year of epilepsy', 'age','Lesion'] # 
+        features = ['Seizure Frequency (/m)', 'Number of medication','Age of oneset','Year of epilepsy', 'age','Lesion'] #
         df2 = clinical_data_df[features]
         # df2 Lesion to 0,1
         df2['Lesion'] = df2['Lesion'].apply(lambda x: 0 if x != 0 else 1)
@@ -675,14 +675,14 @@ def pca_bbbd(clinical_data_df):
         plt.ylabel('Explained Variance')
         plt.show()
         return df
-    
+
 
 
 
 
 def plot_shap_feature_importance(clinical_data_df, target_column):
     clinical_data_df.columns
-    features = ['Focal/General', 'Focal Type', 'age', 'gender', 
+    features = ['Focal/General', 'Focal Type', 'age', 'gender',
                  'Epilepsy type', 'Seizures type', 'Medications', 'Number of medications', 'Divalproex', 'Tegretol',
                    'Levetiracetam', 'Lamotrigine', 'Divalproex.1', 'Lacosamide', 'Family History', 'Age of oneset', 'Year of epilepsy',
                      'Seizure Frequency (/m)', 'Number of medication','Lesion','EEG']
@@ -714,7 +714,7 @@ def plot_shap_feature_importance(clinical_data_df, target_column):
 def bar_plot(df,y_label,palette,filename):
     # df columns to float
     df = df.astype(float)
-    # sns bar plot 
+    # sns bar plot
     plt.figure(figsize=(10, 6))
     df.plot(kind='bar', color=palette, legend=False)
     plt.ylabel(y_label)
@@ -1044,7 +1044,7 @@ def results_paper_dyn():
     df["Epilepsy"] = pd.to_numeric(df["Epilepsy"], errors="coerce")
     df["Controls"] = pd.to_numeric(df["Controls"], errors="coerce")
     stats, p = mannwhitneyu(df["Epilepsy"].dropna(), df["Controls"].dropna())
-    
+
     exponent = math.floor(math.log10(abs(p)))
     # mann whitney df['Epilepsy'], df['Controls']
     d1 = pd.to_numeric(mat_lin_avg_regions, errors="coerce")
