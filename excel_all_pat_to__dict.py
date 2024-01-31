@@ -452,7 +452,7 @@ def get_results():
     # df_2sd_t.to_csv("figures/df_126_areas_mean.csv", index=False)
     # df_BBB_percent.to_csv("figures/df_BBB_percent.csv", index=False)
     # df_2bbbd.to_csv("figures/bbbd_126_areas.csv", index=False)
-    # df_2sd.to_csv("figures/zscore126.csv", index=False)
+    # df_2sd.to_csv("figures/zscore126.csv", index=True)
     # medicine_df(clinical_data_df,result_mat_lin_age,df_126,controls_126_mean,controls_126_std,df_2bbbd)
     # plots(df,df_2sd)
     def matching_bbb_clinical(Epilepsy_clinical_data):
@@ -482,7 +482,7 @@ def get_results():
             elif ftype.find('L') != -1:
                 side = 'Left'
             else:
-                continue
+                # continue
                 side = ' '
             # run over ftype letters TFOP
             for letter in re.findall("[TFOP]", ftype):
@@ -521,6 +521,7 @@ def get_results():
     return df_BBB_percent, df_2sd
 
 import re
+
 def tonic_clonic(Epilepsy_clinical_data):
     Epilepsy_clinical_data2 = Epilepsy_clinical_data.iloc[:Epilepsy_clinical_data["Seizures type"].dropna().str.contains("TCS").shape[0]]
     df = pd.DataFrame(
@@ -529,7 +530,13 @@ def tonic_clonic(Epilepsy_clinical_data):
             "Non-TCS": Epilepsy_clinical_data2[~Epilepsy_clinical_data2["Seizures type"].dropna().str.contains("TCS")]['# regions with BBBD'].reset_index(drop=True),
         }
     )
-    create_scientific_boxplot(df,y_label="#, Regions",filename = 'Tonic_clonic')
+    # create_scientific_boxplot(df,y_label="#, Regions",filename = 'Tonic_clonic')
+    df = pd.DataFrame(
+        {
+            "TCS": Epilepsy_clinical_data2["Seizures type"].dropna().str.contains("TCS").astype(int),
+        }
+    )
+    return df
 
 def facility(clinical_data_df,df_2bbbd):
     clinical_data_df2 = clinical_data_df[clinical_data_df['Focal/General'].notna()]
@@ -552,12 +559,13 @@ def facility(clinical_data_df,df_2bbbd):
     create_scientific_boxplot(df,y_label="#, Regions",filename = 'Facility_controls')
 
 def num_regions_to_plots(clinical_data_df):
-
+    from scipy.stats import pearsonr
     clinical_data_df.columns
     # clinical_data_df['gender'] drop '
     clinical_data_df['gender'] = clinical_data_df['gender'].str.strip("'")
     # clinical_data_df['gender'], change F to 1 and M to 0
     clinical_data_df['gender'] = clinical_data_df['gender'].map({'F': 1, 'M': 0})
+    number_of_regions = clinical_data_df['# regions with BBBD'].dropna().astype(int).reset_index(drop=True)
     # high_bbb_group bigger than median
     high_bbb_group = clinical_data_df[clinical_data_df["BBB%"] > clinical_data_df["BBB%"].median()]
     # low_bbb_group smaller than median
@@ -573,10 +581,104 @@ def num_regions_to_plots(clinical_data_df):
         if col == 'Seizure Frequency (/m)':
             col = 'Seizure Frequency'
         create_scientific_boxplot(df,y_label=col,palette=sns.color_palette(["#000000", "#FF0000"]),filename = col)
+    cols_to_run = ['Year of epilepsy','Age of oneset','age','Seizure Frequency (/m)']
+    for col in cols_to_run:
+        pwe= pd.to_numeric(clinical_data_df[col], errors='coerce').dropna().reset_index(drop=True)
+        df = pd.concat([pwe, number_of_regions], axis=1)
+        # rename columns
+        # boxplot Year of epilepsy
+        if col == 'Seizure Frequency (/m)':
+            col = 'Seizure Frequency'
+        # if df col 0,1 is linear significant 
+        # if df col 0,1 is linear significant 
+        correlation, p_value = pearsonr(df.iloc[:, 0].fillna(df.iloc[:, 0].median()), df.iloc[:, 1])
+        if p_value < 0.05:
+            print(f'The relationship between {df.columns[0]} and {df.columns[1]} is significantly linear. p={p_value}')
+        else:
+            print(f'The relationship between {df.columns[0]} and {df.columns[1]} is not significantly linear. p={p_value}')
+                
 
 import shap
 import xgboost as xgb
 import matplotlib.pyplot as plt
+
+def pca_bbbd(clinical_data_df):
+    all_features = False
+    # tonic_clonic
+    df = tonic_clonic(clinical_data_df)
+    number_of_regions = clinical_data_df['# regions with BBBD'].dropna().astype(int).reset_index(drop=True)
+    if all_features:
+        features = ['Seizure Frequency (/m)', 'Number of medication','Age of oneset','Year of epilepsy', 'age','Lesion'] # 
+        df2 = clinical_data_df[features]
+        # df2 Lesion to 0,1
+        df2['Lesion'] = df2['Lesion'].apply(lambda x: 0 if x != 0 else 1)
+        df2['Focal'] = clinical_data_df['Focal/General'].apply(lambda x: 0 if pd.isna(x) or x != 'F' else 1)
+        df2['General'] = clinical_data_df['Focal/General'].apply(lambda x: 0 if pd.isna(x) or x != 'G' else 1)
+    else:
+        features = ['Seizure Frequency (/m)', 'Number of medication','Year of epilepsy'] # ,'Age of oneset'
+        df2 = clinical_data_df[features]
+    df = pd.concat([df, df2], axis=1)
+    # drop na based on 'Number of medication' column
+    df = df.dropna(subset=['Number of medication'])
+    # fill nan with median
+    df = df.fillna(df.median())
+    # do PCA target column '# regions with BBBD'
+    from sklearn.decomposition import PCA
+    # PCA 2 components
+    pca = PCA(n_components=2)
+    X_pca = pca.fit_transform(df)
+    print(pca.explained_variance_ratio_)
+    # spearman correlation for each column in df and each component
+    from scipy.stats import spearmanr
+    # Convert PCA components to DataFrame for easier manipulation
+    pca_df = pd.DataFrame(X_pca, columns=[f'PC{i+1}' for i in range(X_pca.shape[1])])
+    import seaborn as sns
+    # Initialize a DataFrame to store the correlations
+    correlation_df = pd.DataFrame(index=df.columns, columns=pca_df.columns)
+    # Calculate Spearman correlation for each column in df and each PCA component
+    for column in df.columns:
+        for pc in pca_df.columns:
+            correlation, _ = spearmanr(df[column], pca_df[pc])
+            correlation_df.loc[column, pc] = correlation
+    # Convert the correlations to numeric values for plotting
+    correlation_df = correlation_df.astype(float)
+    # rename columns with explained variance
+    correlation_df.columns = [f'PC{i+1} {np.round(pca.explained_variance_ratio_[i],2)}% exp var' for i in range(X_pca.shape[1])]
+    # Create a heatmap of the correlations
+    sns.heatmap(correlation_df, annot=True, cmap='coolwarm')
+    plt.show()
+    # correlation between components and number of regions
+    for pc in pca_df.columns:
+        correlation, _ = spearmanr(pca_df[pc], number_of_regions)
+        print(f'Spearman correlation between {pc} and number of regions: {np.round(correlation,2)}')
+
+    def pca_bbbd(clinical_data_df):
+        # drop nan all
+        import matplotlib.pyplot as plt
+        # Determine the number of columns in the DataFrame
+        num_columns = df.shape[1]
+        # Initialize a list to store the explained variance ratios
+        explained_variance_ratios = []
+        # Loop over the range from 1 to the number of columns
+        for i in range(1, num_columns):
+            # Perform PCA with n_components set to the current number
+            pca = PCA(n_components=i)
+            X_pca = pca.fit_transform(df)
+            # Print the explained variance ratio
+            explained_variance_ratio = sum(pca.explained_variance_ratio_)
+            print(f'Explained variance ratio for {i} components: {explained_variance_ratio}')
+            # Add the explained variance ratio to the list
+            explained_variance_ratios.append(explained_variance_ratio)
+        # Plot the explained variance ratios
+        plt.plot(range(1, num_columns), explained_variance_ratios)
+        plt.xlabel('Number of Components')
+        plt.ylabel('Explained Variance')
+        plt.show()
+        return df
+    
+
+
+
 
 def plot_shap_feature_importance(clinical_data_df, target_column):
     clinical_data_df.columns
@@ -650,13 +752,17 @@ def age_gender_ect(clinical_data_df,df_2sd_t,df):
     """
     Regression analysis of brain volume in patients with epilepsy who have a lesion showed 10.77 ± 7.81% of voxels exhibited BBBD, while the average z-score for all regions was 1.27 ± 1.41.
     """
-    clinical_data_df["'gender'"] = clinical_data_df["'gender'"].str.strip("'")
+    clinical_data_df["gender"] = clinical_data_df["gender"].str.strip("'")
     gender_zscore = pd.DataFrame( {'Men': df_2sd_t['Epilepsy'].dropna()[clinical_data_df["'gender'"] == 'M'].reset_index(drop=True),
     'Women': df_2sd_t['Epilepsy'].dropna()[clinical_data_df["'gender'"] == 'F'].reset_index(drop=True),}
     )
     gender_bbb = pd.DataFrame(
         {'Men': df['Epilepsy'].dropna()[clinical_data_df["'gender'"] == 'M'].reset_index(drop=True),
         'Women': df['Epilepsy'].dropna()[clinical_data_df["'gender'"] == 'F'].reset_index(drop=True),}
+    )
+    gender_bbb = pd.DataFrame(
+        {'Men': df_2bbbd['Epilepsy'].dropna()[clinical_data_df["gender"] == 0].reset_index(drop=True),
+        'Women': df_2bbbd['Epilepsy'].dropna()[clinical_data_df["gender"] == 1].reset_index(drop=True),}
     )
     gender_bbb['Men'] = pd.to_numeric(gender_bbb['Men'], errors='coerce')
     gender_bbb['Women'] = pd.to_numeric(gender_bbb['Women'], errors='coerce')
@@ -687,6 +793,7 @@ def age_gender_ect(clinical_data_df,df_2sd_t,df):
     In addition, statistical comparison demonstrated insignificant differences between age of onset and BBB% (p-value = {p_value3:.2f}) as well as and averaged z-score for all regions (p-value = {p_value33:.2f}).
     Finally, statistical comparison demonstrated insignificant differences between years of epilepsy and BBB% (p-value = {p_value4:.2f}) as well as and averaged z-score for all regions (p-value = {p_value44:.2f}).
     """.replace('\n',' ')
+    gender_bbb.to_csv('figures/gender_bbb.csv')
 
 
 import numpy as np
