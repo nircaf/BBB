@@ -454,6 +454,7 @@ def get_results():
     # df_2bbbd.to_csv("figures/bbbd_126_areas.csv", index=False)
     # df_2sd.to_csv("figures/zscore126.csv", index=True)
     # medicine_df(clinical_data_df,result_mat_lin_age,df_126,controls_126_mean,controls_126_std,df_2bbbd)
+    # df_126.to_csv("figures/df_126.csv", index=False)
     # plots(df,df_2sd)
     def matching_bbb_clinical(Epilepsy_clinical_data):
         Epilepsy_clinical_data = Epilepsy_clinical_data[Epilepsy_clinical_data['Focal/General'].notna()]
