@@ -521,6 +521,7 @@ def get_results():
         di_contra = {k: 100*v / di_sum[k] if di_sum[k] != 0 else 0 for k, v in di_contra.items()}
         df.to_csv("figures/matching_bbb_clinical.csv")
         df_all = pd.concat([df.mean(axis=1),df_contra.mean(axis=1)],axis=1).dropna().rename(columns={0:'Ipsilateral',1:'Contralateral'})
+        df_all.round(2).to_string()
         create_scientific_boxplot(df_all,y_label="MAD",filename = 'matching_bbb_clinical')
     # plots(df,df_2sd)
     def matching_bbb_clinical(Epilepsy_clinical_data):
