@@ -456,6 +456,73 @@ def get_results():
     # medicine_df(clinical_data_df,result_mat_lin_age,df_126,controls_126_mean,controls_126_std,df_2bbbd)
     # df_126.to_csv("figures/df_126.csv", index=False)
     # plots(df,df_2sd)
+    def bbb_side_automation(Epilepsy_clinical_data):
+        Epilepsy_clinical_data = Epilepsy_clinical_data[Epilepsy_clinical_data['Focal/General'].notna()]
+        df = pd.DataFrame(index = result_mat_lin_age126.drop(columns=["'ID'"]).columns.str.strip("'"))
+        df_contra = pd.DataFrame(index = result_mat_lin_age126.drop(columns=["'ID'"]).columns.str.strip("'"))
+        count_sig = 0
+        di = {'frontal': 0, 'temporal': 0, 'generalized': 0,'occipital':0,'parietal':0}
+        di_sum = {'frontal': 0, 'temporal': 0, 'generalized': 0,'occipital':0,'parietal':0}
+        di_contra = {'frontal': 0, 'temporal': 0, 'generalized': 0,'occipital':0,'parietal':0}
+        for index,row in Epilepsy_clinical_data.iterrows():
+            code =row['code']
+            ftype = row['Focal Type']
+            areas = result_mat_lin_age126[result_mat_lin_age126["'ID'"]==code.strip("'")].drop(columns=["'ID'"])
+            # strip "'" from areas index
+            areas = areas.rename(columns=lambda x: x.strip("'")).T
+            areas_above_controls = (areas.iloc[:,0] - controls_126_mean) / controls_126_std
+            if ftype != ftype:
+                continue
+                if row['Focal/General'].find('G') != -1:
+                    di_sum['generalized'] += 1
+                    # if more than 50% of areas_above_controls are above 2 sd of controls
+                    if sum(areas_above_controls > 2)/len(areas_above_controls) > 0.5:
+                        di['generalized'] += 1
+                    df = pd.concat([df,areas_above_controls],axis=1)
+                    continue
+            # run over ftype letters TFOP
+            for letter in re.findall("[TFOP]", ftype):
+                # if ftype contains T
+                if letter == 'T':
+                    # find index in areas with "temporal"
+                    lobe = 'temporal'
+                elif letter == 'F':
+                    # find index in areas with "frontal"
+                    lobe = 'frontal'
+                elif letter == 'O':
+                    # find index in areas with "occipital"
+                    lobe = 'occipital'
+                elif letter == 'P':
+                    # find index in areas with "parietal"
+                    lobe = 'parietal'
+                q_areas = areas_above_controls[areas_above_controls.index.str.contains(lobe)]
+                # find out which side based on number of regions are higher in one side vs the other
+                q_area_right = q_areas[q_areas.index.str.contains('Right')]
+                q_area_left = q_areas[q_areas.index.str.contains('Left')]
+                # Calculate the difference between the right and left areas
+                difference = q_area_right.reset_index(drop=True) - q_area_left.reset_index(drop=True)
+                # Count the number of areas that are larger on the right side
+                side = 'Right' if ((difference > 0).sum()) > ((difference < 0).sum()) else 'Left'
+                q_areas = q_areas[q_areas.index.str.contains(side)]
+                di_sum[lobe] += 1
+                di[lobe] += 1 if any(q_areas >= 2) else 0
+                other_side = 'Left' if side == 'Right' else 'Right'
+                q_areas_contra = areas_above_controls[areas_above_controls.index.str.contains(lobe)]
+                q_areas_contra = q_areas_contra[q_areas_contra.index.str.contains(other_side)]
+                di_contra[lobe] += 1 if any(q_areas_contra >= 2) else 0
+                df_contra = pd.concat([df_contra,q_areas_contra],axis=1)
+                df = pd.concat([df,q_areas],axis=1)
+                # mann whitney test q_areas vs q_areas_contra
+                u,p = mannwhitneyu(q_areas,q_areas_contra)
+                if p<0.05:
+                    count_sig += 1
+        print(sum(di.values())/sum(di_sum.values()))
+        di = {k: 100*v / di_sum[k] if di_sum[k] != 0 else 0 for k, v in di.items()}
+        di_contra = {k: 100*v / di_sum[k] if di_sum[k] != 0 else 0 for k, v in di_contra.items()}
+        df.to_csv("figures/matching_bbb_clinical.csv")
+        df_all = pd.concat([df.mean(axis=1),df_contra.mean(axis=1)],axis=1).dropna().rename(columns={0:'Ipsilateral',1:'Contralateral'})
+        create_scientific_boxplot(df_all,y_label="MAD",filename = 'matching_bbb_clinical')
+    # plots(df,df_2sd)
     def matching_bbb_clinical(Epilepsy_clinical_data):
         Epilepsy_clinical_data = Epilepsy_clinical_data[Epilepsy_clinical_data['Focal/General'].notna()]
         df = pd.DataFrame()
@@ -516,9 +583,9 @@ def get_results():
         di = {k: 100*v / di_sum[k] if di_sum[k] != 0 else 0 for k, v in di.items()}
         di_contra = {k: 100*v / di_sum[k] if di_sum[k] != 0 else 0 for k, v in di_contra.items()}
         df.to_csv("figures/matching_bbb_clinical.csv")
-    # Example usage
+
     # plot_shap_feature_importance(clinical_data_df, '# regions with BBBD')
-    matching_bbb_clinical(Epilepsy_clinical_data)
+    bbb_side_automation(Epilepsy_clinical_data)
     return df_BBB_percent, df_2sd
 
 import re
