@@ -670,6 +670,9 @@ def num_regions_to_plots(clinical_data_df):
 import shap
 import xgboost as xgb
 import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
+from scipy.stats import spearmanr
+import seaborn as sns
 
 def pca_bbbd(clinical_data_df):
     all_features = False
@@ -692,16 +695,13 @@ def pca_bbbd(clinical_data_df):
     # fill nan with median
     df = df.fillna(df.median())
     # do PCA target column '# regions with BBBD'
-    from sklearn.decomposition import PCA
     # PCA 2 components
     pca = PCA(n_components=2)
     X_pca = pca.fit_transform(df)
     print(pca.explained_variance_ratio_)
     # spearman correlation for each column in df and each component
-    from scipy.stats import spearmanr
     # Convert PCA components to DataFrame for easier manipulation
     pca_df = pd.DataFrame(X_pca, columns=[f'PC{i+1}' for i in range(X_pca.shape[1])])
-    import seaborn as sns
     # Initialize a DataFrame to store the correlations
     correlation_df = pd.DataFrame(index=df.columns, columns=pca_df.columns)
     # Calculate Spearman correlation for each column in df and each PCA component
@@ -718,12 +718,9 @@ def pca_bbbd(clinical_data_df):
     plt.show()
     # correlation between components and number of regions
     for pc in pca_df.columns:
-        correlation, _ = spearmanr(pca_df[pc], number_of_regions)
-        print(f'Spearman correlation between {pc} and number of regions: {np.round(correlation,2)}')
-
+        correlation, p_value = spearmanr(pca_df[pc], number_of_regions)
+        print(f'Correlation between {pc} and number of regions: {correlation}, p-value: {p_value}')
     def pca_bbbd(clinical_data_df):
-        # drop nan all
-        import matplotlib.pyplot as plt
         # Determine the number of columns in the DataFrame
         num_columns = df.shape[1]
         # Initialize a list to store the explained variance ratios
